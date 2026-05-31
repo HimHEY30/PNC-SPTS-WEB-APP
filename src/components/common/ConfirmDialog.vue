@@ -1,4 +1,7 @@
 <script setup lang="ts">
+// A ready-to-use confirmation dialog - ask the user "are you sure?" before doing something important
+// Handles the backdrop click, cancel, and confirm for you
+
 import BaseButton from '@/components/ui/buttons/BaseButton.vue'
 
 interface Props {
@@ -26,6 +29,7 @@ const emit = defineEmits<{
   (e: 'close'): void
 }>()
 
+// If user clicks the dark area outside the dialog, treat it like closing
 const handleBackdropClick = () => {
   emit('close')
 }

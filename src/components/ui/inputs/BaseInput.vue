@@ -1,4 +1,7 @@
 <script setup lang="ts">
+// Reusable input field that works with v-model
+// Just pass a label, placeholder, and bind it with v-model like a normal input
+
 interface Props {
   label?: string
   placeholder?: string
@@ -11,6 +14,8 @@ withDefaults(defineProps<Props>(), {
   type: 'text',
 })
 
+// This is the standard pattern to make a custom component work with v-model
+// Whenever the user types, we emit the new value back up to the parent
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
 }>()

@@ -25,4 +25,12 @@ export default defineConfigWithVueTs(
     files: ['src/**/__tests__/*'],
   },
   skipFormatting,
+
+  {
+    name: 'app/component-name-allowlist',
+    files: ['src/components/layouts/*.vue'],
+    rules: {
+      'vue/multi-word-component-names': 'off',
+    },
+  },
 )

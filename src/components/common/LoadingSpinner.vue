@@ -1,4 +1,7 @@
 <script setup lang="ts">
+// A spinning loading indicator - show this whenever something is loading
+// You can make it small, medium, large, or full-screen with optional text underneath
+
 interface Props {
   size?: 'sm' | 'md' | 'lg'
   text?: string
@@ -11,6 +14,8 @@ const props = withDefaults(defineProps<Props>(), {
   fullScreen: false,
 })
 
+// Map size names to actual Tailwind classes
+// sm = thin border, lg = thick border
 const spinnerSize = {
   sm: 'w-5 h-5 border-2',
   md: 'w-8 h-8 border-4',

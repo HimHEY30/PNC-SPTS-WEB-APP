@@ -18,7 +18,7 @@ const props = withDefaults(defineProps<Props>(), {
     disabled: false,
     type: 'button',
 })
-
+// Grab the right button colors depending on what kind of button they want
 const variantClasses = computed(() => {
     switch (props.variant) {
         case 'secondary':
@@ -32,6 +32,7 @@ const variantClasses = computed(() => {
     }
 })
 
+// Same thing but for the size - small, medium, or large
 const sizeClasses = computed(() => {
     switch (props.size) {
         case 'sm':
