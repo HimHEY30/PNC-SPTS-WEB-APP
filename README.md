@@ -1,49 +1,56 @@
-# PNC SPTS Web App
+# 🎓 PNC SPTS Web App
+> **Student Performance Tracking System** — a sleek, Trello-inspired kanban board designed for monitoring and managing student performance metrics.
 
-Student Performance Tracking System — a Trello-inspired kanban board for tracking student performance.
+---
 
-## Tech Stack
+## ⚡ Tech Stack
 
-- **Vue 3** with Composition API + `<script setup>`
-- **TypeScript**
-- **Vite 7**
-- **Pinia** (state management)
-- **Vue Router**
-- **Tailwind CSS 4**
-- **Tabler Icons**
+The application is built using a modern, performant web development stack:
 
-## Project Setup
+* 🟢 **Vue 3** (Composition API with `<script setup>`)
+* 🔵 **TypeScript** (Strongly typed code structure)
+* ⚡ **Vite 7** (Ultra-fast build tool and bundler)
+* 🍍 **Pinia** (Modular state management)
+* 🛣️ **Vue Router** (SPA client-side routing)
+* 🎨 **Tailwind CSS 4** (Utility-first styling system)
+* 🔣 **Tabler Icons** (Clean, modern SVG iconography)
 
-```sh
+---
+
+## 🚀 Getting Started
+
+### 📋 Prerequisites
+Make sure you have [Node.js](https://nodejs.org/) installed (version `^20.19.0` or `>=22.12.0` is recommended).
+
+### 🔧 Installation
+Install the project dependencies using npm:
+```bash
 npm install
 ```
 
-### Compile and Hot-Reload for Development
-
-```sh
+### 💻 Local Development
+Start the hot-reloading development server:
+```bash
 npm run dev
 ```
 
-### Type-Check, Compile and Minify for Production
-
-```sh
+### 🏗️ Production Build
+Type-check, compile, and minify the application for production deployment:
+```bash
 npm run build
 ```
 
-### Run Unit Tests
+---
 
-```sh
-npm run test:unit
-```
+## 🧪 Quality Assurance & Scripts
 
-### Lint
+Ensure code quality and run checks with the following commands:
 
-```sh
-npm run lint
-```
+| Command | Action / Purpose |
+| :--- | :--- |
+| `npm run test:unit` | Execute unit tests via Vitest |
+| `npm run lint` | Run ESLint static code analysis with auto-fix enabled |
+| `npm run type-check` | Run TypeScript compiler checks |
+| `npm run format` | Prettier code formatter for consistent code style |
+| `npm run clean` | Clean build outputs and delete `/dist` directory |
 
-### Lint
-
-```sh
-npm run lint
-```

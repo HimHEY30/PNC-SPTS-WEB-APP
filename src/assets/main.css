@@ -31,7 +31,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fafafa;
+  background: url('https://i.pinimg.com/736x/26/7d/c4/267dc427eb76251d3a6dd1271d4f6de5.jpg') no-repeat center center;
+  background-size: cover;
   padding: 20px;
 }
 
@@ -177,4 +178,40 @@ body {
   font-weight: 500;
   margin: 0;
 }
+
+/* ── Dark Dropdown Items (used in StudentBoard.vue) ── */
+.dark-drop-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  color: rgba(255,255,255,0.7);
+  font-size: 0.8rem;
+  font-weight: 500;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.1s;
+  background: none;
+  border: none;
+  font-family: inherit;
+  text-align: left;
+}
+
+.dark-drop-item:hover {
+  background: rgba(255,255,255,0.06);
+  color: #fff;
+}
+
+.dark-drop-item.active {
+  background: #512da8 !important;
+  color: #fff !important;
+  font-weight: 600;
+}
+
+.dark-drop-item.active svg {
+  color: #fff !important;
+}
+
+.dark-drop-item svg { color: #f43f5e; flex-shrink: 0; }
 

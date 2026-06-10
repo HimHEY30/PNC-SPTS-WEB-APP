@@ -1,10 +1,8 @@
-// Defines all the pages (routes) in the app and who can see them
-// The auth guard below makes sure people can't sneak into /board without logging in
-
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import LoginView from '@/views/LoginView.vue'
 import StudentBoard from '@/views/StudentBoard.vue'
-import { useAuthStore } from '@/stores/auth'
+import AdminLayout from '@/layouts/AdminLayout.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -20,11 +18,75 @@ const router = createRouter({
       component: StudentBoard,
       meta: { requiresAuth: true },
     },
+    {
+      path: '/admin',
+      component: AdminLayout,
+      children: [
+        {
+          path: '',
+          name: 'admin-dashboard',
+          component: () => import('@/views/admin/DashboardView.vue'),
+        },
+        {
+          path: 'teachers',
+          name: 'admin-teachers',
+          component: () => import('@/views/admin/TeacherManagementView.vue'),
+        },
+        {
+          path: 'tasks',
+          name: 'admin-tasks',
+          component: () => import('@/views/admin/FollowUpTimelineView.vue'),
+        },
+        {
+          path: 'students',
+          name: 'admin-students',
+          component: () => import('@/views/admin/StudentListView.vue'),
+        },
+        {
+          path: 'students/:id',
+          name: 'admin-student-profile',
+          component: () => import('@/views/admin/StudentDetailsView.vue'),
+        },
+        {
+          path: 'calendar',
+          name: 'admin-calendar',
+          component: () => import('@/views/admin/CalendarView.vue'),
+        },
+        {
+          path: 'courses',
+          name: 'admin-courses',
+          component: () => import('@/views/admin/CourseManagementView.vue'),
+        },
+        {
+          path: 'reports',
+          name: 'admin-reports',
+          component: () => import('@/views/admin/PlaceholderView.vue'),
+        },
+        {
+          path: 'settings',
+          name: 'admin-settings',
+          component: () => import('@/views/admin/FollowUpTypesView.vue'),
+        },
+        {
+          path: 'goals',
+          name: 'admin-goals',
+          component: () => import('@/views/admin/PlaceholderView.vue'),
+        },
+        {
+          path: 'active',
+          name: 'admin-active',
+          component: () => import('@/views/admin/PlaceholderView.vue'),
+        },
+        {
+          path: 'website',
+          name: 'admin-website',
+          component: () => import('@/views/admin/PlaceholderView.vue'),
+        },
+      ],
+    },
   ],
 })
 
-// Navigation guard - runs before every page change
-// If the page needs auth and user isn't logged in, kick them back to login
 router.beforeEach((to, _from, next) => {
   const auth = useAuthStore()
   if (to.meta.requiresAuth && !auth.isAuthenticated) {

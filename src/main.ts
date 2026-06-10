@@ -9,10 +9,26 @@ import router from './router'
 
 const app = createApp(App)
 
-// Pinia handles all the app-wide state (like who's logged in)
+app.directive('click-outside', {
+  mounted(el: HTMLElement, binding) {
+    const handler = (event: MouseEvent) => {
+      if (!(el === event.target || el.contains(event.target as Node))) {
+        binding.value()
+      }
+    }
+    const element = el as HTMLElement & { __clickOutside?: (event: MouseEvent) => void }
+    element.__clickOutside = handler
+    document.addEventListener('click', handler)
+  },
+  unmounted(el: HTMLElement) {
+    const element = el as HTMLElement & { __clickOutside?: (event: MouseEvent) => void }
+    if (element.__clickOutside) {
+      document.removeEventListener('click', element.__clickOutside)
+    }
+  },
+})
+
 app.use(createPinia())
-// Router handles page navigation
 app.use(router)
 
-// Attach everything to the <div id="app"> in index.html
 app.mount('#app')
