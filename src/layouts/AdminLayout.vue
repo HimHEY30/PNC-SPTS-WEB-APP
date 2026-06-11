@@ -28,9 +28,12 @@ const pageTitle = computed(() => {
   if (path.startsWith('/admin/students')) return 'Student List'
   if (path.startsWith('/admin/tasks')) return 'Follow-Up Timeline'
   if (path.startsWith('/admin/courses')) return 'Course Management'
+  if (path.startsWith('/admin/active')) return 'Active Follow-Ups'
   if (path.startsWith('/admin/reports')) return 'Reports & Analytics'
   if (path.startsWith('/admin/settings')) return 'Follow-Up Type Management'
   if (path.startsWith('/admin/calendar')) return 'Calendar'
+  if (path.startsWith('/admin/goals')) return 'Goal Setting'
+  if (path.startsWith('/admin/website')) return 'PNC Portal'
   return 'Admin Panel'
 })
 

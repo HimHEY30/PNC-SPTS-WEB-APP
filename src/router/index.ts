@@ -65,7 +65,7 @@ const router = createRouter({
         {
           path: 'reports',
           name: 'admin-reports',
-          component: () => import('@/views/admin/PlaceholderView.vue'),
+          component: () => import('@/views/admin/ReportsView.vue'),
         },
         {
           path: 'settings',
@@ -75,17 +75,17 @@ const router = createRouter({
         {
           path: 'goals',
           name: 'admin-goals',
-          component: () => import('@/views/admin/PlaceholderView.vue'),
+          component: () => import('@/views/admin/GoalSettingView.vue'),
         },
         {
           path: 'active',
           name: 'admin-active',
-          component: () => import('@/views/admin/PlaceholderView.vue'),
+          component: () => import('@/views/admin/ActiveFollowUpsView.vue'),
         },
         {
           path: 'website',
           name: 'admin-website',
-          component: () => import('@/views/admin/PlaceholderView.vue'),
+          component: () => import('@/views/admin/PncPortalView.vue'),
         },
         {
           path: 'profile',

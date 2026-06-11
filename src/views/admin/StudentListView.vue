@@ -93,8 +93,8 @@ const navigateToProfile = (id: string) => {
             v-model="searchQuery"
             type="text" 
             placeholder="Search by name or Student ID..." 
-            class="w-full bg-[#f1f3f9] text-[#1e293b] rounded-[5px] py-2 pl-10 pr-4 text-xs border border-transparent outline-none focus:bg-white focus:border-indigo-200 transition-all"
-          >
+            class="w-full bg-[#f1f3f9] text-[#1e293b] rounded-[5px] py-1.5 pl-8 pr-3 text-xs border border-transparent outline-none focus:bg-[#f1f3f9]"
+          />
           <IconSearch class="w-4 h-4 text-[#94a3b8] absolute left-3 top-1/2 -translate-y-1/2" />
         </div>
 

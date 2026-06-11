@@ -250,9 +250,9 @@ const averageProgress = computed(() => {
                 v-model="courseSearchQuery"
                 type="text" 
                 placeholder="Search courses..."
-                class="w-full bg-white border border-slate-200 rounded-[3px] py-1.5 pl-8 pr-3 text-[10px] outline-none focus:border-indigo-300 transition-all shadow-sm"
+                class="w-full bg-[#f1f3f9] text-[#1e293b] rounded-[5px] py-1.5 pl-8 pr-3 text-xs border border-transparent outline-none focus:bg-[#f1f3f9]"
               />
-              <IconSearch class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <IconSearch class="w-4 h-4 text-[#94a3b8] absolute left-3 top-1/2 -translate-y-1/2" />
             </div>
             <BaseDropdown v-model="courseStatusFilter" :options="courseStatusOptions" size="sm" position="right" />
             <button class="text-[10px] font-bold text-slate-400 hover:text-slate-600 shrink-0">See all</button>

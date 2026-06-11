@@ -35,10 +35,10 @@ const recentActivity = ref([
 
 const getPriorityClass = (priority: string) => {
   switch (priority) {
-    case 'Critical': return 'bg-rose-100 text-rose-700'
-    case 'High': return 'bg-orange-100 text-orange-700'
-    case 'Medium': return 'bg-amber-100 text-amber-700'
-    case 'Low': return 'bg-emerald-100 text-emerald-700'
+    case 'Critical': return 'bg-rose-100 text-rose-700 border-rose-200'
+    case 'High': return 'bg-orange-100 text-orange-700 border-orange-200'
+    case 'Medium': return 'bg-amber-100 text-amber-700 border-amber-200'
+    case 'Low': return 'bg-emerald-100 text-emerald-700 border-emerald-200'
     default: return 'bg-slate-100 text-slate-700'
   }
 }
@@ -120,7 +120,7 @@ const getPriorityClass = (priority: string) => {
                   <p class="text-[10px] font-bold text-slate-400 mt-px">{{ activity.type }}</p>
                 </td>
                 <td class="px-3 py-2">
-                  <span :class="['px-1.5 py-0.5 rounded-[3px] text-[9px] font-bold', getPriorityClass(activity.priority)]">
+                  <span :class="['inline-flex items-center rounded-[3px] px-2 py-0.5 text-[10px] font-bold border', getPriorityClass(activity.priority)]">
                     {{ activity.priority }}
                   </span>
                 </td>

@@ -52,7 +52,7 @@ const selectedLabel = computed(() => {
   <div class="relative select-none" v-click-outside="close">
     <button
       @click="toggle"
-      class="flex items-center gap-2 bg-white rounded-[5px] text-xs font-bold text-[#1e293b] hover:bg-slate-50 transition-colors shadow-sm"
+      class="flex items-center gap-2 bg-white rounded-[3px] text-xs font-bold text-[#1e293b] hover:bg-slate-50 transition-colors shadow-sm"
       :class="size === 'sm' ? 'px-3 py-1.5' : 'px-4 py-2 min-w-[160px]'"
     >
       <component :is="icon" v-if="icon" class="h-4 w-4 text-slate-400 shrink-0" />
@@ -73,7 +73,7 @@ const selectedLabel = computed(() => {
     >
       <div
         v-if="isOpen"
-        :class="['absolute mt-2 bg-white rounded-[5px] shadow-2xl py-1 z-30 overflow-hidden', position === 'right' ? 'right-0' : 'left-0', width]"
+        :class="['absolute mt-2 bg-white rounded-[3px] shadow-sm py-1 z-30 overflow-hidden', position === 'right' ? 'right-0' : 'left-0', width]"
       >
         <button
           v-for="opt in options"
