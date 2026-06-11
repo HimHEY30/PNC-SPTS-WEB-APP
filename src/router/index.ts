@@ -28,6 +28,11 @@ const router = createRouter({
           component: () => import('@/views/admin/DashboardView.vue'),
         },
         {
+          path: 'users',
+          name: 'admin-users',
+          component: () => import('@/views/admin/UserManagementView.vue'),
+        },
+        {
           path: 'teachers',
           name: 'admin-teachers',
           component: () => import('@/views/admin/TeacherManagementView.vue'),
@@ -81,6 +86,11 @@ const router = createRouter({
           path: 'website',
           name: 'admin-website',
           component: () => import('@/views/admin/PlaceholderView.vue'),
+        },
+        {
+          path: 'profile',
+          name: 'admin-profile',
+          component: () => import('@/views/admin/ProfileView.vue'),
         },
       ],
     },

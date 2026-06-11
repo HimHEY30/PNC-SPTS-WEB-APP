@@ -47,6 +47,7 @@ const menuGroups = [
   {
     title: 'Administration',
     items: [
+      { to: '/admin/users', label: 'User Management', icon: IconUsers },
       { to: '/admin/teachers', label: 'Teacher Management', icon: IconBook },
       { to: '/admin/active', label: 'Active Follow-Ups', icon: IconBriefcase },
       { to: '/admin/reports', label: 'Reports', icon: IconChartBar },

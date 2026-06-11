@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, type Component } from 'vue'
 import { IconChevronDown } from '@tabler/icons-vue'
 
 export interface DropdownOption {
@@ -12,7 +12,7 @@ const props = withDefaults(defineProps<{
   modelValue: string | number
   options: DropdownOption[]
   placeholder?: string
-  icon?: object
+  icon?: Component
   position?: 'left' | 'right'
   width?: string
   size?: 'md' | 'sm'

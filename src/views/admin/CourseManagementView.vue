@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import BaseDropdown from '@/components/ui/dropdowns/BaseDropdown.vue'
+import type { DropdownOption } from '@/components/ui/dropdowns/BaseDropdown.vue'
 import {
   IconSearch,
   IconPlus,

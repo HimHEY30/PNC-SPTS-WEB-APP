@@ -8,6 +8,7 @@ import {
   IconSearch,
   IconBell,
   IconChevronDown,
+  IconUser,
   IconLogout,
 } from '@tabler/icons-vue'
 
@@ -22,6 +23,7 @@ provide('searchQuery', searchQuery)
 const pageTitle = computed(() => {
   const path = route.path
   if (path === '/admin') return 'Dashboard'
+  if (path.startsWith('/admin/users')) return 'User Management'
   if (path.startsWith('/admin/teachers')) return 'Teacher Management'
   if (path.startsWith('/admin/students')) return 'Student List'
   if (path.startsWith('/admin/tasks')) return 'Follow-Up Timeline'
@@ -74,12 +76,16 @@ const handleLogout = () => {
               @click="isProfileMenuOpen = !isProfileMenuOpen"
               class="flex items-center gap-2 bg-white p-1 pr-2.5 rounded-[5px] border border-slate-50 cursor-pointer hover:bg-gray-50 transition-colors select-none"
             >
-              <img :src="tolaAvatar" class="w-7 h-7 rounded-full object-cover" alt="User avatar" />
+              <img
+                :src="auth.user?.profile_image || tolaAvatar"
+                class="w-7 h-7 rounded-full object-cover"
+                alt="User avatar"
+              />
               <div class="text-left leading-none hidden sm:block">
-                <p class="text-xs font-black text-[#1e293b]">Omotola Hazyz</p>
+                <p class="text-xs font-black text-[#1e293b]">{{ auth.user?.name || 'Omotola Hazyz' }}</p>
                 <div class="flex items-center gap-1 mt-0.5">
                   <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
-                  <span class="text-[9px] text-emerald-600 font-black uppercase tracking-wider">Online</span>
+                  <span class="text-[9px] text-emerald-600 font-black uppercase tracking-wider">{{ auth.user?.entity_type || 'Online' }}</span>
                 </div>
               </div>
               <IconChevronDown class="w-3.5 h-3.5 text-[#64748b]" />
@@ -90,6 +96,14 @@ const handleLogout = () => {
               v-if="isProfileMenuOpen"
               class="absolute right-0 mt-1.5 w-44 bg-white border border-slate-50 rounded-[5px] shadow-lg py-1 z-50"
             >
+              <button
+                @click="router.push('/admin/profile'); isProfileMenuOpen = false"
+                class="flex w-full items-center gap-2 px-4 py-2 text-xs text-[#475569] hover:bg-slate-50 transition-colors"
+              >
+                <IconUser class="w-4 h-4" />
+                View Profile
+              </button>
+              <hr class="border-slate-100 my-1" />
               <button
                 @click="handleLogout"
                 class="flex w-full items-center gap-2 px-4 py-2 text-xs text-[#475569] hover:bg-red-50 hover:text-red-600 transition-colors"

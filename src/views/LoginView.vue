@@ -18,17 +18,33 @@ const loading = ref(false)
 
 // Runs when user clicks the Sign In button
 // Shows a loading state for half a second, then logs in and redirects to the board
-const submit = (e: Event) => {
+const submit = async (e: Event) => {
   e.preventDefault()
   error.value = ''
+  
+  if (!email.value || !password.value) {
+    error.value = 'Please enter both email and password'
+    return
+  }
+  
   loading.value = true
 
-  // Simulate a short network delay so the loading animation is visible
-  setTimeout(() => {
-    auth.login()
-    router.push('/board')
+  try {
+    const success = await auth.login({ 
+      email: email.value, 
+      password: password.value 
+    })
+    
+    if (success) {
+      router.push('/board')
+    } else {
+      error.value = 'Invalid credentials'
+    }
+  } catch (err: any) {
+    error.value = err.response?.data?.message || 'Failed to login. Please check your credentials.'
+  } finally {
     loading.value = false
-  }, 500)
+  }
 }
 </script>
 
@@ -87,8 +103,8 @@ const submit = (e: Event) => {
       </form>
 
       <div class="demo-info">
-        <p class="demo-label">Demo Account</p>
-        <p class="demo-creds">admin@admin.com / admin</p>
+        <p class="demo-label">Staging Account</p>
+        <p class="demo-creds">superadmin@example.com / Password123!</p>
       </div>
     </div>
   </div>
