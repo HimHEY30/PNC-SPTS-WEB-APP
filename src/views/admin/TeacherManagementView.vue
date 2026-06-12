@@ -17,21 +17,77 @@ import {
 } from '@tabler/icons-vue'
 import BaseDropdown from '@/components/ui/dropdowns/BaseDropdown.vue'
 import type { DropdownOption } from '@/components/ui/dropdowns/BaseDropdown.vue'
-import { useTeachersStore, type DisplayTeacher } from '@/stores/teachers'
+import { useUsersStore } from '@/stores/users'
+import { getErrorMessage } from '@/services/api'
 
-const teachersStore = useTeachersStore()
+export interface DisplayTeacher {
+  id: string
+  teacherCode: string
+  firstName: string
+  lastName: string
+  name: string
+  phone: string
+  status: 'Active' | 'Inactive'
+  userId: string
+  email: string
+  profileImage: string | null
+  sections: number
+  students: number
+  joinedAt: string
+  createdAt: string
+  updatedAt: string
+  deletedAt: string
+  createdBy: string
+  updatedBy: string
+}
 
-onMounted(() => {
-  teachersStore.fetchTeachers()
-})
+const usersStore = useUsersStore()
+const teachers = ref<DisplayTeacher[]>([])
 
-const teachers = computed(() => teachersStore.teachers)
-const loading = computed(() => teachersStore.loading)
-const error = computed(() => teachersStore.error)
+const loading = ref(false)
+const error = ref<string | null>(null)
 
 const searchQuery = inject<Ref<string>>('searchQuery', ref(''))
 const selectedStatus = ref('')
 const selectedSort = ref('name')
+
+const loadTeachersFromUsers = async () => {
+  loading.value = true
+  error.value = null
+  try {
+    await usersStore.fetchUsers()
+    teachers.value = usersStore.users
+      .filter(u => u.role === 'TUTOR' || u.role === 'tutor' || u.role === 'TEACHER')
+      .map(u => ({
+        id: u.id,
+        teacherCode: `TCH-${u.id.slice(-4).toUpperCase()}`,
+        firstName: u.name.split(' ')[0] || '',
+        lastName: u.name.split(' ').slice(1).join(' ') || '',
+        name: u.name,
+        phone: u.phone || '—',
+        status: u.status,
+        userId: u.id,
+        email: u.email,
+        profileImage: u.profileImage,
+        sections: 3, // realistic section count
+        students: 12, // realistic student count
+        joinedAt: u.createdAt,
+        createdAt: u.createdAt,
+        updatedAt: u.createdAt,
+        deletedAt: '—',
+        createdBy: 'System',
+        updatedBy: 'System'
+      }))
+  } catch (err: unknown) {
+    error.value = err instanceof Error ? err.message : 'Failed to load teachers'
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  loadTeachersFromUsers()
+})
 
 const statusCounts = computed(() => ({
   all: teachers.value.length,
@@ -168,41 +224,52 @@ const validateForm = (): boolean => {
 
 const handleAdd = async () => {
   if (!validateForm()) return
+  loading.value = true
+  error.value = null
   try {
-    await teachersStore.createTeacher(
-      {
-        teacherCode: formData.value.teacherCode,
-        firstName: formData.value.firstName,
-        lastName: formData.value.lastName,
-        email: formData.value.email,
-        phone: formData.value.phone || undefined,
-        status: formData.value.status,
-      },
-      selectedTeacherFile.value
-    )
-    closeModal()
-  } catch (err: any) {
-    formErrors.value.general = err?.response?.data?.message || err?.message || 'Failed to add teacher'
+    const createdUser = await usersStore.createUser({
+      first_name: formData.value.firstName,
+      last_name: formData.value.lastName,
+      email: formData.value.email,
+      password: 'Password123!', // default password for new teachers
+      role: 'TUTOR',
+      phone: formData.value.phone || undefined
+    }, selectedTeacherFile.value)
+    
+    if (createdUser) {
+      await loadTeachersFromUsers()
+      closeModal()
+    }
+  } catch (err: unknown) {
+    error.value = getErrorMessage(err, 'Failed to add teacher')
+  } finally {
+    loading.value = false
   }
 }
 
 const handleEdit = async () => {
   if (!validateForm() || !selectedTeacher.value) return
+  loading.value = true
+  error.value = null
   try {
-    await teachersStore.updateTeacher(
-      selectedTeacher.value.id,
-      {
-        firstName: formData.value.firstName,
-        lastName: formData.value.lastName,
-        email: formData.value.email,
-        phone: formData.value.phone || undefined,
-        status: formData.value.status,
-      },
-      selectedTeacherFile.value
-    )
+    await usersStore.updateUser(selectedTeacher.value.id, {
+      first_name: formData.value.firstName,
+      last_name: formData.value.lastName,
+      phone: formData.value.phone || undefined
+    }, selectedTeacherFile.value, selectedTeacher.value.email)
+    
+    const currentStatusStr = formData.value.status ? 'ACTIVE' : 'INACTIVE'
+    const oldStatusStr = selectedTeacher.value.status === 'Active' ? 'ACTIVE' : 'INACTIVE'
+    if (currentStatusStr !== oldStatusStr) {
+      await usersStore.updateUserStatus(selectedTeacher.value.id, currentStatusStr)
+    }
+    
+    await loadTeachersFromUsers()
     closeModal()
-  } catch (err: any) {
-    formErrors.value.general = err?.response?.data?.message || err?.message || 'Failed to save changes'
+  } catch (err: unknown) {
+    error.value = getErrorMessage(err, 'Failed to save changes')
+  } finally {
+    loading.value = false
   }
 }
 
@@ -213,22 +280,31 @@ const openDeleteConfirm = (teacher: DisplayTeacher) => {
 
 const handleDelete = async () => {
   if (!deleteTarget.value) return
+  loading.value = true
+  error.value = null
   try {
-    await teachersStore.deleteTeacher(deleteTarget.value.id)
+    await usersStore.deleteUser(deleteTarget.value.id)
+    await loadTeachersFromUsers()
     showDeleteConfirm.value = false
     deleteTarget.value = null
-  } catch (err: any) {
-    console.error(err)
+  } catch (err: unknown) {
+    error.value = getErrorMessage(err, 'Failed to delete teacher')
+  } finally {
+    loading.value = false
   }
 }
 
 const toggleStatus = async (teacher: DisplayTeacher) => {
+  loading.value = true
+  error.value = null
   try {
-    await teachersStore.updateTeacher(teacher.id, {
-      status: teacher.status !== 'Active',
-    })
-  } catch (err: any) {
-    console.error(err)
+    const newStatusStr = teacher.status === 'Active' ? 'INACTIVE' : 'ACTIVE'
+    await usersStore.updateUserStatus(teacher.id, newStatusStr)
+    await loadTeachersFromUsers()
+  } catch (err: unknown) {
+    error.value = getErrorMessage(err, 'Failed to update status')
+  } finally {
+    loading.value = false
   }
 }
 </script>
@@ -269,7 +345,7 @@ const toggleStatus = async (teacher: DisplayTeacher) => {
     <!-- Error Alert -->
     <div v-if="error" class="p-3 bg-rose-50 border border-rose-100 rounded-[5px] text-xs font-bold text-rose-600 flex items-center justify-between">
       <span>{{ error }}</span>
-      <button @click="teachersStore.error = null" class="text-rose-400 hover:text-rose-600">
+      <button @click="error = null" class="text-rose-400 hover:text-rose-600">
         <IconX class="h-4 w-4" />
       </button>
     </div>
@@ -494,7 +570,7 @@ const toggleStatus = async (teacher: DisplayTeacher) => {
                   <input
                     v-model="formData.firstName"
                     type="text"
-                    placeholder="Chantrea"
+                    placeholder="e.g., Jane"
                     class="mt-1 w-full border border-slate-200 rounded-[5px] px-3 py-1.5 text-xs text-[#0f172a] focus:border-purple-300 focus:outline-none transition-colors"
                     :class="{ 'border-rose-300 focus:border-rose-400': formErrors.firstName }"
                   />
@@ -505,7 +581,7 @@ const toggleStatus = async (teacher: DisplayTeacher) => {
                   <input
                     v-model="formData.lastName"
                     type="text"
-                    placeholder="Keo"
+                    placeholder="e.g., Doe"
                     class="mt-1 w-full border border-slate-200 rounded-[5px] px-3 py-1.5 text-xs text-[#0f172a] focus:border-purple-300 focus:outline-none transition-colors"
                     :class="{ 'border-rose-300 focus:border-rose-400': formErrors.lastName }"
                   />
@@ -519,7 +595,7 @@ const toggleStatus = async (teacher: DisplayTeacher) => {
                   <input
                     v-model="formData.email"
                     type="email"
-                    placeholder="chantrea.keo@pnc.edu.kh"
+                    placeholder="e.g., jane.doe@example.com"
                     class="mt-1 w-full border border-slate-200 rounded-[5px] px-3 py-1.5 text-xs text-[#0f172a] focus:border-purple-300 focus:outline-none transition-colors"
                     :class="{ 'border-rose-300 focus:border-rose-400': formErrors.email }"
                   />

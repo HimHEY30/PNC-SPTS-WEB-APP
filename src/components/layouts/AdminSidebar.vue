@@ -7,13 +7,13 @@ import {
   IconGitFork,
   IconListCheck,
   IconCalendar,
-  IconTarget,
   IconBook,
   IconBriefcase,
   IconChartBar,
   IconGlobe,
   IconChevronRight,
   IconChevronLeft,
+  IconSchool,
 } from '@tabler/icons-vue'
 import logoSrc from '@/assets/images/logo1.png'
 
@@ -36,7 +36,7 @@ const menuGroups = [
     items: [
       { to: '/admin/tasks', label: 'Follow-Up Timeline', icon: IconListCheck },
       { to: '/admin/calendar', label: 'Calendar', icon: IconCalendar },
-      { to: '/admin/goals', label: 'Goal Setting', icon: IconTarget },
+      { to: '/admin/goals', label: 'Goal Setting', icon: IconSchool },
     ],
   },
   {

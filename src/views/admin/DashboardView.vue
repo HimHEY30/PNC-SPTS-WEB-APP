@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import {
   IconUsers,
   IconBriefcase,
@@ -13,10 +13,26 @@ import {
   IconChevronRight,
   IconCalendarEvent,
 } from '@tabler/icons-vue'
+import { useStudentsStore } from '@/stores/students'
+
+const studentsStore = useStudentsStore()
+const studentsLoading = ref(false)
+
+onMounted(async () => {
+  if (!studentsStore.fetched) {
+    studentsLoading.value = true
+    await studentsStore.fetchStudents()
+    studentsLoading.value = false
+  }
+})
+
+const totalStudents = computed(() => {
+  return studentsStore.students.length.toLocaleString()
+})
 
 // Stat Cards data matching SRS Page 2
-const stats = ref([
-  { label: 'Total Students', value: '1,284', icon: IconUsers, color: 'bg-blue-50 text-blue-600', trend: '+12%' },
+const stats = computed(() => [
+  { label: 'Total Students', value: studentsLoading.value ? '...' : totalStudents.value, icon: IconUsers, color: 'bg-blue-50 text-blue-600', trend: '+12%' },
   { label: 'Students Under Follow-Up', value: '86', icon: IconBriefcase, color: 'bg-amber-50 text-amber-600', trend: '+4%' },
   { label: 'Open Cases', value: '24', icon: IconClock, color: 'bg-rose-50 text-rose-600', trend: '-2%' },
   { label: 'Resolved Cases', value: '112', icon: IconCircleCheck, color: 'bg-emerald-50 text-emerald-600', trend: '+18%' },

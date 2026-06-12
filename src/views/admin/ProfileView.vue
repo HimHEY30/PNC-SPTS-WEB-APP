@@ -2,7 +2,7 @@
 import { ref, reactive, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
-import { api } from '@/services/api'
+import { api, getErrorMessage } from '@/services/api'
 import {
   IconUser,
   IconCheck,
@@ -39,6 +39,7 @@ const previewUrl = ref<string | null>(null)
 const form = reactive({
   first_name: '',
   last_name: '',
+  email: '',
   phone: '',
 })
 
@@ -50,6 +51,7 @@ const currentAvatar = computed(() => {
 function startEdit() {
   form.first_name = auth.user?.first_name || ''
   form.last_name = auth.user?.last_name || ''
+  form.email = auth.user?.email || ''
   form.phone = auth.user?.phone || ''
   selectedFile.value = null
   previewUrl.value = null
@@ -85,57 +87,61 @@ async function saveEdit() {
   saving.value = true
   error.value = ''
   success.value = ''
-  
-  const localUpdate: Record<string, unknown> = {
+
+  let profileImage: string | undefined
+  let uploadFailed = false
+  if (selectedFile.value) {
+    try {
+      const imgFd = new FormData()
+      imgFd.append('image', selectedFile.value)
+      // The endpoint in UsersController is @Post('profile/image')
+      const imgRes = await api.post('/users/profile/image', imgFd)
+      // The interceptor might wrap it in { data: { url: ... } }
+      profileImage = imgRes.data?.data?.url || imgRes.data?.url
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.warn('Image upload failed; falling back to local image cache:', msg)
+      uploadFailed = true
+      if (previewUrl.value) {
+        localStorage.setItem('cached_profile_image_' + (auth.user?.email || ''), previewUrl.value)
+      }
+    }
+  }
+
+  const payload: Record<string, unknown> = {
     first_name: form.first_name,
     last_name: form.last_name,
     phone: form.phone || null,
   }
-  if (previewUrl.value) {
-    localUpdate.profile_image = previewUrl.value
+  if (profileImage) {
+    payload.profileImage = profileImage
   }
-  
+
   try {
-    let profileImage = undefined
-    if (selectedFile.value) {
-      const imgFd = new FormData()
-      imgFd.append('image', selectedFile.value)
-      const imgRes = await api.post('/api/users/profile/image', imgFd)
-      if (imgRes.data?.data?.url) {
-        profileImage = imgRes.data.data.url
+    try {
+      // Correct endpoint is /users/profile (PATCH)
+      await api.patch('/users/profile', payload)
+    } catch (err: unknown) {
+      const errObj = err as { response?: { status?: number; data?: { statusCode?: number } } }
+      const is404 = errObj?.response?.status === 404 || errObj?.response?.data?.statusCode === 404
+      const userId = auth.user?.id || auth.user?.user_id
+      if (is404 && userId) {
+        console.warn(`PATCH /users/profile returned 404, attempting fallback to PATCH /users/${userId}`)
+        await api.patch(`/users/${userId}`, payload)
+      } else {
+        throw err
       }
     }
-    const payload: Record<string, unknown> = {
-      first_name: form.first_name,
-      last_name: form.last_name,
-      phone: form.phone || null,
-    }
-    if (profileImage) {
-      payload.profileImage = profileImage
-      localUpdate.profile_image = profileImage
-    }
-    const res = await api.patch('/api/users/profile', payload)
-    if (res.data?.success) {
-      await auth.fetchProfile()
-      editing.value = false
-      selectedFile.value = null
-      previewUrl.value = null
-      success.value = 'Profile updated successfully'
-    } else {
-      auth.updateUserLocal(localUpdate)
-      editing.value = false
-      selectedFile.value = null
-      previewUrl.value = null
-      success.value = 'Profile updated locally'
-    }
-  } catch (err) {
-    console.warn('API update failed, saving profile locally in cache:', err)
-    auth.updateUserLocal(localUpdate)
+    await auth.fetchProfile()
+    success.value = uploadFailed 
+      ? 'Profile text saved (Image saved locally only)' 
+      : 'Profile updated successfully'
     editing.value = false
+  } catch (err: unknown) {
+    error.value = getErrorMessage(err, 'Failed to update profile')
+  } finally {
     selectedFile.value = null
     previewUrl.value = null
-    success.value = 'Profile updated locally (offline mode)'
-  } finally {
     saving.value = false
   }
 }
@@ -222,7 +228,7 @@ function fmt(val: unknown): string {
         <!-- Name and Role -->
         <div class="text-center mt-4 px-4">
           <h1 class="text-lg font-bold text-slate-800 truncate">
-            {{ auth.user?.first_name || '' }} {{ auth.user?.last_name || 'User' }}
+            {{ auth.user?.name || 'User' }}
           </h1>
           <p class="text-xs text-slate-400 capitalize mt-0.5 truncate">
             {{ auth.user?.entity_type?.replace('_', ' ') || '' }}
@@ -356,6 +362,17 @@ function fmt(val: unknown): string {
                   placeholder="Enter last name..."
                 />
               </div>
+            </div>
+            <div>
+              <label for="profile-email-input" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Email Address</label>
+              <input
+                id="profile-email-input"
+                v-model="form.email"
+                type="email"
+                disabled
+                class="w-full rounded-[3px] border border-slate-200 px-3 py-1.5 text-xs text-slate-400 bg-slate-50 focus:outline-none cursor-not-allowed"
+                placeholder="Enter email address..."
+              />
             </div>
             <div>
               <label for="profile-phone-input" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Phone Number</label>

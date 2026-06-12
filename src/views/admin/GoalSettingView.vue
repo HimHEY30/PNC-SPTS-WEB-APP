@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, inject, type Ref } from 'vue'
 import {
-  IconTarget,
   IconCheck,
   IconClock,
   IconPlus,
   IconEdit,
-  IconTrash,
+
   IconUser,
   IconBook,
   IconFlag,
@@ -108,7 +107,11 @@ const overviewStats = computed(() => ({
       <div class="bg-white rounded-[5px] border border-slate-100 p-3 shadow-sm space-y-2 hover:shadow transition-all cursor-default">
         <div class="flex items-center justify-between">
           <div class="p-1.5 rounded-[5px] bg-slate-100 text-slate-600">
-            <IconTarget class="w-5 h-5" />
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
+              <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+              <path d="M22 9l-10 -4l-10 4l10 4l10 -4v6" />
+              <path d="M6 10.6v5.4a6 3 0 0 0 12 0v-5.4" />
+            </svg>
           </div>
         </div>
         <div>
@@ -223,7 +226,7 @@ const overviewStats = computed(() => ({
                     <IconEdit class="h-4 w-4" />
                   </button>
                   <button class="w-7 h-7 rounded-[5px] border border-slate-200 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50/50 transition-all shadow-sm" title="Delete">
-                    <IconTrash class="h-4 w-4" />
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
                   </button>
                 </div>
               </td>
@@ -234,7 +237,11 @@ const overviewStats = computed(() => ({
     </div>
 
     <div v-if="filteredGoals.length === 0" class="flex flex-col items-center justify-center py-16">
-      <IconTarget class="h-10 w-10 text-slate-300" />
+      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-10 w-10 text-slate-300">
+        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+        <path d="M22 9l-10 -4l-10 4l10 4l10 -4v6" />
+        <path d="M6 10.6v5.4a6 3 0 0 0 12 0v-5.4" />
+      </svg>
       <p class="mt-2 text-xs font-bold text-slate-500">No goals found</p>
       <p class="text-[10px] text-slate-400 mt-0.5">Try adjusting your search or filters</p>
     </div>

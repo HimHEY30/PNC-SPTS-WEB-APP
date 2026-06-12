@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
-import { api } from '@/services/api'
+import { api, getErrorMessage } from '@/services/api'
 
 export interface ApiStudent {
   id: string
@@ -106,33 +106,19 @@ export const useStudentsStore = defineStore('students', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await api.get('/api/students')
-      const raw: ApiStudent[] = response.data?.data ?? response.data ?? []
+      const response = await api.get('/students')
+      
+      const payload = response.data?.data ?? response.data
+      let raw: ApiStudent[] = []
+      if (Array.isArray(payload)) {
+        raw = payload
+      } else if (payload && Array.isArray(payload.data)) {
+        raw = payload.data
+      }
+
       const fetchedList = raw.map(toDisplay)
       
-      // Merge fetched students with local cache to preserve client-side edits (like profileImage)
-      const cachedList = loadCached()
-      const mergedList = fetchedList.map(f => {
-        const cached = cachedList.find(c => c.id === f.id)
-        if (cached) {
-          return {
-            ...f,
-            firstName: cached.firstName,
-            lastName: cached.lastName,
-            name: cached.name,
-            email: cached.email,
-            phone: cached.phone,
-            placeOfBirth: cached.placeOfBirth,
-            status: cached.status,
-            classId: cached.classId,
-            profileImage: cached.profileImage,
-            updatedAt: cached.updatedAt,
-          }
-        }
-        return f
-      })
-      
-      students.value = mergedList
+      students.value = fetchedList
       cacheData(students.value)
       fetched.value = true
     } catch (e: unknown) {
@@ -146,5 +132,95 @@ export const useStudentsStore = defineStore('students', () => {
     }
   }
 
-  return { students, loading, error, fetched, fetchStudents }
+  async function createStudent(payload: Record<string, unknown>, file?: File | null) {
+    loading.value = true
+    error.value = null
+    try {
+      let response;
+      if (file) {
+        const fd = new FormData()
+        fd.append('image', file)
+        Object.keys(payload).forEach(key => {
+          if (payload[key] !== undefined && payload[key] !== null) {
+            fd.append(key, String(payload[key]))
+          }
+        })
+        response = await api.post('/students', fd)
+      } else {
+        const cleanPayload = { ...payload }
+        delete cleanPayload['status']
+        delete cleanPayload['profileImage']
+        response = await api.post('/students', cleanPayload)
+      }
+      
+      const created: ApiStudent = response.data?.data ?? response.data
+      
+      // Preserve local profileImage preview if backend didn't return it
+      if (!created.profileImage && typeof payload['profileImage'] === 'string') {
+        created.profileImage = payload['profileImage']
+      }
+      
+      const disp = toDisplay(created)
+      students.value.unshift(disp)
+      cacheData(students.value)
+      return disp
+    } catch (e: unknown) {
+      error.value = getErrorMessage(e, 'Failed to create student')
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function updateStudent(id: string, payload: Record<string, unknown>, file?: File | null) {
+    loading.value = true
+    error.value = null
+    try {
+      let response;
+      if (file) {
+        const fd = new FormData()
+        fd.append('image', file)
+        Object.keys(payload).forEach(key => {
+          if (payload[key] !== undefined && payload[key] !== null) {
+            fd.append(key, String(payload[key]))
+          }
+        })
+        response = await api.patch(`/students/${id}`, fd)
+      } else {
+        const cleanPayload = { ...payload }
+        delete cleanPayload['profileImage']
+        response = await api.patch(`/students/${id}`, cleanPayload)
+      }
+
+      const updated: ApiStudent = response.data?.data ?? response.data
+      
+      // Preserve local profileImage preview if backend didn't return it
+      if (!updated.profileImage && typeof payload['profileImage'] === 'string') {
+        updated.profileImage = payload['profileImage']
+      }
+      
+      const disp = toDisplay(updated)
+      const idx = students.value.findIndex(s => s.id === id)
+      if (idx !== -1) {
+        students.value[idx] = disp
+      }
+      cacheData(students.value)
+      return disp
+    } catch (e: unknown) {
+      error.value = getErrorMessage(e, 'Failed to update student')
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  return { 
+    students, 
+    loading, 
+    error, 
+    fetched, 
+    fetchStudents, 
+    createStudent, 
+    updateStudent 
+  }
 })

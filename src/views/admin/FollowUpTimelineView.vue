@@ -3,7 +3,6 @@ import { ref, computed } from 'vue'
 import {
   IconPlus,
   IconEdit,
-  IconTrash,
   IconFileText,
   IconCalendar,
 } from '@tabler/icons-vue'
@@ -197,7 +196,7 @@ const getStatusClass = (status: string) => {
                 <IconEdit class="w-4 h-4" />
               </button>
               <button class="p-1.5 rounded-[5px] text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-all">
-                <IconTrash class="w-4 h-4" />
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
               </button>
             </div>
           </div>

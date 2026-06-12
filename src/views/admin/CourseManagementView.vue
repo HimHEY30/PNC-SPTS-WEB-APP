@@ -4,9 +4,6 @@ import BaseDropdown from '@/components/ui/dropdowns/BaseDropdown.vue'
 import type { DropdownOption } from '@/components/ui/dropdowns/BaseDropdown.vue'
 import {
   IconSearch,
-  IconPlus,
-  IconChevronRight,
-  IconBook,
   IconCheck,
   IconClock,
   IconStar,
@@ -200,17 +197,6 @@ const filteredCourses = computed(() => {
   })
 })
 
-const totalCourses = computed(() => courses.value.length)
-const activeCourses = computed(() =>
-  courses.value.filter(course => course.status === 'Ongoing').length,
-)
-const completedCourses = computed(() =>
-  courses.value.filter(course => course.status === 'Completed').length,
-)
-const averageProgress = computed(() => {
-  if (!courses.value.length) return 0
-  return Math.round(courses.value.reduce((sum, course) => sum + course.progress, 0) / courses.value.length)
-})
 </script>
 
 <template>

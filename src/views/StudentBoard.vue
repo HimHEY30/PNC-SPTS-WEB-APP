@@ -174,6 +174,16 @@ const handleLogout = () => {
   auth.logout()
   router.push('/')
 }
+
+const userInitials = computed(() => {
+  const name = auth.user?.name || ''
+  if (!name) return 'U'
+  const parts = name.split(' ')
+  if (parts.length >= 2 && parts[0] && parts[1]) {
+    return (parts[0][0] + parts[1][0]).toUpperCase()
+  }
+  return name.slice(0, 2).toUpperCase()
+})
 </script>
 
 <template>
@@ -213,9 +223,16 @@ const handleLogout = () => {
         <div 
           ref="avatarRef"
           @click="isProfileMenuOpen = !isProfileMenuOpen"
-          class="w-8 h-8 rounded-full bg-[#ff7452] flex items-center justify-center font-bold text-sm text-white cursor-pointer hover:brightness-110 transition-all border-2 border-[#1d2125]"
+          class="w-8 h-8 rounded-full bg-[#ff7452] flex items-center justify-center font-bold text-sm text-white cursor-pointer hover:brightness-110 transition-all border-2 border-[#1d2125] overflow-hidden"
         >
-          LS
+          <img
+            v-if="auth.user?.profile_image"
+            :src="auth.user.profile_image"
+            @error="(e) => (e.target as HTMLImageElement).style.display = 'none'"
+            class="w-full h-full object-cover"
+            alt="User avatar"
+          />
+          <span v-else>{{ userInitials }}</span>
         </div>
 
         <Teleport to="body">
@@ -233,10 +250,19 @@ const handleLogout = () => {
             <div class="px-2 py-1">
               <p class="text-[10px] font-bold text-white/40 mb-2 uppercase tracking-wider px-1">Account</p>
               <div class="flex items-center gap-3 mb-2 px-1">
-                <div class="w-10 h-10 rounded-full bg-[#ff7452] flex items-center justify-center font-bold text-lg text-white shrink-0">LS</div>
+                <div class="w-10 h-10 rounded-full bg-[#ff7452] flex items-center justify-center font-bold text-lg text-white shrink-0 overflow-hidden">
+                  <img
+                    v-if="auth.user?.profile_image"
+                    :src="auth.user.profile_image"
+                    @error="(e) => (e.target as HTMLImageElement).style.display = 'none'"
+                    class="w-full h-full object-cover"
+                    alt="User avatar"
+                  />
+                  <span v-else>{{ userInitials }}</span>
+                </div>
                 <div class="overflow-hidden">
-                  <p class="text-sm font-medium text-white truncate">Le thean Seourn</p>
-                  <p class="text-[11px] text-white/40 truncate">letheanseourn05@gmail.com</p>
+                  <p class="text-sm font-medium text-white truncate">{{ auth.user?.name || 'User' }}</p>
+                  <p class="text-[11px] text-white/40 truncate">{{ auth.user?.email || '' }}</p>
                 </div>
               </div>
               <button class="dark-drop-item w-full">Switch accounts</button>

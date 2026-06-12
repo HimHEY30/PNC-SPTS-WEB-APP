@@ -3,7 +3,16 @@ import { ref, computed, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import AdminSidebar from '@/components/layouts/AdminSidebar.vue'
-import tolaAvatar from '@/assets/images/tola_avatar.png'
+
+const userInitials = computed(() => {
+  const name = auth.user?.name || ''
+  if (!name) return 'U'
+  const parts = name.split(' ')
+  if (parts.length >= 2 && parts[0] && parts[1]) {
+    return (parts[0][0] + parts[1][0]).toUpperCase()
+  }
+  return name.slice(0, 2).toUpperCase()
+})
 import {
   IconSearch,
   IconBell,
@@ -79,13 +88,18 @@ const handleLogout = () => {
               @click="isProfileMenuOpen = !isProfileMenuOpen"
               class="flex items-center gap-2 bg-white p-1 pr-2.5 rounded-[5px] border border-slate-50 cursor-pointer hover:bg-gray-50 transition-colors select-none"
             >
-              <img
-                :src="auth.user?.profile_image || tolaAvatar"
-                class="w-7 h-7 rounded-full object-cover"
-                alt="User avatar"
-              />
+              <div class="relative w-7 h-7 rounded-full bg-[#3b4b6b] flex items-center justify-center overflow-hidden shrink-0 border border-slate-200 font-bold text-[10px] text-white select-none">
+                <img
+                  v-if="auth.user?.profile_image"
+                  :src="auth.user.profile_image"
+                  @error="(e) => (e.target as HTMLImageElement).style.display = 'none'"
+                  class="relative z-10 w-full h-full object-cover"
+                  alt="User avatar"
+                />
+                <span v-else>{{ userInitials }}</span>
+              </div>
               <div class="text-left leading-none hidden sm:block">
-                <p class="text-xs font-black text-[#1e293b]">{{ auth.user?.name || 'Omotola Hazyz' }}</p>
+                <p class="text-xs font-black text-[#1e293b]">{{ auth.user?.name || 'User' }}</p>
                 <div class="flex items-center gap-1 mt-0.5">
                   <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
                   <span class="text-[9px] text-emerald-600 font-black uppercase tracking-wider">{{ auth.user?.entity_type || 'Online' }}</span>

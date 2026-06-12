@@ -5,6 +5,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { getErrorMessage } from '@/services/api'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -23,7 +24,7 @@ const submit = async (e: Event) => {
   error.value = ''
   
   if (!email.value || !password.value) {
-    error.value = 'Please enter both email and password'
+    error.value = 'Please fill in all fields'
     return
   }
   
@@ -40,8 +41,8 @@ const submit = async (e: Event) => {
     } else {
       error.value = 'Invalid credentials'
     }
-  } catch (err: any) {
-    error.value = err.response?.data?.message || 'Failed to login. Please check your credentials.'
+  } catch (err: unknown) {
+    error.value = getErrorMessage(err, 'Failed to login. Please check your credentials.')
   } finally {
     loading.value = false
   }

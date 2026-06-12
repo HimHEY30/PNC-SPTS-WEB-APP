@@ -10,6 +10,9 @@ import {
 } from '@tabler/icons-vue'
 import BaseDropdown from '@/components/ui/dropdowns/BaseDropdown.vue'
 import type { DropdownOption } from '@/components/ui/dropdowns/BaseDropdown.vue'
+import { useAuthStore } from '@/stores/auth'
+
+const auth = useAuthStore()
 
 interface FollowUpType {
   id: number
@@ -22,7 +25,7 @@ interface FollowUpType {
 const followUpTypes = ref<FollowUpType[]>([
   { id: 1, name: 'Academic', description: 'Concerns regarding grades, exams, or homework assignments', status: 'Active', createdBy: 'Sarah Johnson' },
   { id: 2, name: 'Behaviour', description: 'Disruptive conduct, class attendance, lateness, or classroom violations', status: 'Active', createdBy: 'Sarah Johnson' },
-  { id: 3, name: 'Pastoral Care', description: 'Student welfare, counseling, mental health, and physical wellbeing support', status: 'Active', createdBy: 'Omotola Hazyz' },
+  { id: 3, name: 'Pastoral Care', description: 'Student welfare, counseling, mental health, and physical wellbeing support', status: 'Active', createdBy: 'System' },
   { id: 4, name: 'Achievement', description: 'Outstanding performance, Olympiad recognition, or extra-curricular projects', status: 'Active', createdBy: 'Ms. Chantrea Keo' },
   { id: 5, name: 'Attendance', description: 'Persistent unexcused absences and consecutive missing sessions', status: 'Inactive', createdBy: 'Sarah Johnson' },
 ])
@@ -97,7 +100,7 @@ const handleSave = () => {
       name: formName.value.trim(),
       description: formDescription.value.trim(),
       status: 'Active',
-      createdBy: 'Omotola Hazyz', // Authenticated Admin User
+      createdBy: auth.user?.name || 'Admin', // Authenticated Admin User
     })
   } else if (modalMode.value === 'edit' && editingTypeId.value !== null) {
     const type = followUpTypes.value.find(t => t.id === editingTypeId.value)

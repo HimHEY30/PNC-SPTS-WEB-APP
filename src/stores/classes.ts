@@ -56,7 +56,7 @@ export const useClassesStore = defineStore('classes', () => {
   async function fetchClasses() {
     loading.value = true
     try {
-      const response = await api.get('/api/classes')
+      const response = await api.get('/classes')
       const raw: ApiClass[] = response.data?.data ?? response.data ?? []
       classes.value = raw.map((c) => ({
         id: c.id,

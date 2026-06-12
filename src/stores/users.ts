@@ -22,6 +22,7 @@ export interface DisplayUser {
   name: string
   username: string
   email: string
+  phone: string
   role: string
   status: 'Active' | 'Inactive'
   lastLogin: string
@@ -35,7 +36,8 @@ function toDisplayUser(u: ApiUser): DisplayUser {
     name: `${u.first_name} ${u.last_name}`,
     username: u.email.split('@')[0] ?? u.id.slice(0, 8),
     email: u.email,
-    role: u.roles[0] ?? u.entity_type,
+    phone: u.phone ?? '',
+    role: (u.roles && u.roles[0]) ? u.roles[0] : (u.entity_type || 'USER'),
     status: u.status === 'ACTIVE' ? 'Active' : 'Inactive',
     lastLogin: u.last_login_at
       ? new Date(u.last_login_at).toLocaleDateString('en-US', {
@@ -78,7 +80,7 @@ export const useUsersStore = defineStore('users', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await api.get('/api/users')
+      const response = await api.get('/users')
       const data: ApiUser[] = response.data?.data ?? response.data ?? []
       users.value = data.map(toDisplayUser)
     } catch (e: unknown) {
@@ -92,11 +94,23 @@ export const useUsersStore = defineStore('users', () => {
   async function fetchRoles() {
     if (!hasToken() || rolesList.value.length > 0) return
     try {
-      const response = await api.get('/api/roles')
+      const response = await api.get('/roles')
       const data: ApiRole[] = response.data?.data ?? response.data ?? []
-      rolesList.value = data
-    } catch {
-      // roles fetch is non-critical
+      if (data.length > 0) {
+        rolesList.value = data
+      } else {
+        throw new Error('Empty roles list from server')
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.warn('Failed to fetch roles from API, falling back to default system roles:', msg)
+      rolesList.value = [
+        { id: 'role-1', name: 'ADMIN', description: 'Administrator', permissions: [] },
+        { id: 'role-2', name: 'ACADEMIC_MANAGER', description: 'Academic Manager', permissions: [] },
+        { id: 'role-3', name: 'FOLLOWUP_OFFICER', description: 'Follow-Up Officer', permissions: [] },
+        { id: 'role-4', name: 'TUTOR', description: 'Tutor / Teacher', permissions: [] },
+        { id: 'role-5', name: 'STUDENT', description: 'Student', permissions: [] }
+      ]
     }
   }
 
@@ -111,8 +125,10 @@ export const useUsersStore = defineStore('users', () => {
     },
     imageFile?: File | null
   ) {
-    let data: any = payload
+    let data: unknown = payload
+    let usingFormdata = false
     if (imageFile) {
+      usingFormdata = true
       const fd = new FormData()
       fd.append('first_name', payload.first_name)
       fd.append('last_name', payload.last_name)
@@ -123,10 +139,43 @@ export const useUsersStore = defineStore('users', () => {
       fd.append('image', imageFile)
       data = fd
     }
-    const response = await api.post('/api/users', data)
-    const created: ApiUser = response.data?.data ?? response.data
-    users.value.unshift(toDisplayUser(created))
-    return created
+
+    try {
+      const response = await api.post('/users', data)
+      const created: ApiUser = response.data?.data ?? response.data
+      users.value.unshift(toDisplayUser(created))
+      return created
+    } catch (err: unknown) {
+      if (usingFormdata) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.warn('Multipart user creation failed, retrying as JSON without image...', msg)
+        const response = await api.post('/users', payload)
+        const created: ApiUser = response.data?.data ?? response.data
+        
+        // Cache the base64 image preview in localStorage if possible
+        try {
+          const reader = new FileReader()
+          reader.onload = () => {
+            if (reader.result) {
+              localStorage.setItem('cached_profile_image_' + payload.email, reader.result as string)
+              // Refresh this user in lists if they match
+              const idx = users.value.findIndex(u => u.email === payload.email)
+              if (idx !== -1) {
+                users.value[idx].profileImage = reader.result as string
+              }
+            }
+          }
+          reader.readAsDataURL(imageFile!)
+        } catch (cacheErr) {
+          console.warn('Failed to cache user image locally:', cacheErr)
+        }
+        
+        users.value.unshift(toDisplayUser(created))
+        return created
+      } else {
+        throw err
+      }
+    }
   }
 
   async function updateUser(
@@ -136,10 +185,13 @@ export const useUsersStore = defineStore('users', () => {
       last_name?: string
       phone?: string
     },
-    imageFile?: File | null
+    imageFile?: File | null,
+    email?: string
   ) {
-    let data: any = payload
+    let data: unknown = payload
+    let usingFormdata = false
     if (imageFile) {
+      usingFormdata = true
       const fd = new FormData()
       if (payload.first_name) fd.append('first_name', payload.first_name)
       if (payload.last_name) fd.append('last_name', payload.last_name)
@@ -147,15 +199,49 @@ export const useUsersStore = defineStore('users', () => {
       fd.append('image', imageFile)
       data = fd
     }
-    const response = await api.patch(`/api/users/${id}`, data)
-    const updated: ApiUser = response.data?.data ?? response.data
-    const idx = users.value.findIndex(u => u.id === id)
-    if (idx !== -1) users.value[idx] = toDisplayUser(updated)
-    return updated
+
+    try {
+      const response = await api.patch(`/users/${id}`, data)
+      const updated: ApiUser = response.data?.data ?? response.data
+      const idx = users.value.findIndex(u => u.id === id)
+      if (idx !== -1) users.value[idx] = toDisplayUser(updated)
+      return updated
+    } catch (err: unknown) {
+      if (usingFormdata) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.warn('Multipart user update failed, retrying as JSON without image...', msg)
+        const response = await api.patch(`/users/${id}`, payload)
+        const updated: ApiUser = response.data?.data ?? response.data
+        
+        if (email && imageFile) {
+          try {
+            const reader = new FileReader()
+            reader.onload = () => {
+              if (reader.result) {
+                localStorage.setItem('cached_profile_image_' + email, reader.result as string)
+                const idx = users.value.findIndex(u => u.id === id)
+                if (idx !== -1) {
+                  users.value[idx].profileImage = reader.result as string
+                }
+              }
+            }
+            reader.readAsDataURL(imageFile)
+          } catch (cacheErr) {
+            console.warn('Failed to cache user image locally:', cacheErr)
+          }
+        }
+        
+        const idx = users.value.findIndex(u => u.id === id)
+        if (idx !== -1) users.value[idx] = toDisplayUser(updated)
+        return updated
+      } else {
+        throw err
+      }
+    }
   }
 
   async function assignRole(id: string, role: string) {
-    const response = await api.patch(`/api/users/${id}/role`, { role })
+    const response = await api.patch(`/users/${id}/role`, { role })
     const updated: ApiUser = response.data?.data ?? response.data
     const idx = users.value.findIndex(u => u.id === id)
     if (idx !== -1) users.value[idx] = toDisplayUser(updated)
@@ -163,7 +249,7 @@ export const useUsersStore = defineStore('users', () => {
   }
 
   async function updateUserStatus(id: string, status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'LOCKED') {
-    const response = await api.patch(`/api/users/${id}/status`, { status })
+    const response = await api.patch(`/users/${id}/status`, { status })
     const updated: ApiUser = response.data?.data ?? response.data
     const idx = users.value.findIndex(u => u.id === id)
     if (idx !== -1) users.value[idx] = toDisplayUser(updated)
@@ -171,7 +257,7 @@ export const useUsersStore = defineStore('users', () => {
   }
 
   async function deleteUser(id: string) {
-    await api.delete(`/api/users/${id}`)
+    await api.delete(`/users/${id}`)
     users.value = users.value.filter(u => u.id !== id)
   }
 

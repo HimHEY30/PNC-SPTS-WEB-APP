@@ -2,7 +2,7 @@
 import { ref, computed, inject, type Ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useStudentsStore } from '@/stores/students'
-import nitaraAvatar from '@/assets/images/nitara_avatar.png'
+import { useToastStore } from '@/stores/toast'
 import {
   IconSearch,
   IconMail,
@@ -14,12 +14,14 @@ import {
   IconMessage,
   IconEdit,
   IconX,
+  IconUser,
 } from '@tabler/icons-vue'
 import BaseDropdown from '@/components/ui/dropdowns/BaseDropdown.vue'
 import type { DropdownOption } from '@/components/ui/dropdowns/BaseDropdown.vue'
 
 const route = useRoute()
 const store = useStudentsStore()
+const toast = useToastStore()
 
 const studentId = computed(() => route.params.id as string)
 
@@ -32,7 +34,7 @@ const student = ref({
   address: 'Kampong Cham',
   createdAt: 'Jun 11, 2026',
   status: 'Active',
-  avatar: nitaraAvatar,
+  avatar: '',
   studentCode: 'PNC2025-001',
   placeOfBirth: 'Kampong Cham',
   gender: 'Male',
@@ -95,7 +97,7 @@ const updateLocalStudent = () => {
       address: s.placeOfBirth,
       createdAt: s.createdAt,
       status: s.status,
-      avatar: s.profileImage || nitaraAvatar,
+      avatar: s.profileImage || '',
       studentCode: s.studentCode,
       placeOfBirth: s.placeOfBirth,
       gender: s.gender,
@@ -294,7 +296,7 @@ const filteredCourses = computed(() => {
   })
 })
 
-import { api } from '@/services/api'
+import { getErrorMessage } from '@/services/api'
 
 // Modal controls for editing student
 const showEditModal = ref(false)
@@ -304,7 +306,13 @@ const studentFileInput = ref<HTMLInputElement | null>(null)
 const selectedStudentFile = ref<File | null>(null)
 
 const openEditModal = () => {
-  editFormData.value = { ...student.value }
+  const cleanFormData = { ...student.value }
+  if (cleanFormData.name === '—') cleanFormData.name = ''
+  if (cleanFormData.email === '—') cleanFormData.email = ''
+  if (cleanFormData.phone === '—') cleanFormData.phone = ''
+  if (cleanFormData.address === '—') cleanFormData.address = ''
+  
+  editFormData.value = cleanFormData
   selectedStudentFile.value = null
   formErrors.value = {}
   showEditModal.value = true
@@ -332,83 +340,39 @@ const handleSaveStudent = async () => {
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editFormData.value.email)) {
     errors.email = 'Invalid email format'
   }
-  if (!editFormData.value.phone.trim()) errors.phone = 'Phone is required'
-  if (!editFormData.value.address.trim()) errors.address = 'Address is required'
 
   if (Object.keys(errors).length > 0) {
     formErrors.value = errors
     return
   }
 
-  let uploadedUrl = editFormData.value.avatar
-  
   try {
-    if (selectedStudentFile.value) {
-      const fd = new FormData()
-      fd.append('image', selectedStudentFile.value)
-      const resImg = await api.post('/api/users/profile/image', fd)
-      if (resImg.data?.data?.url) {
-        uploadedUrl = resImg.data.data.url
-      } else if (resImg.data?.url) {
-        uploadedUrl = resImg.data.url
-      }
-    }
-    
     const nameParts = editFormData.value.name.trim().split(' ')
     const firstName = nameParts[0] || ''
     const lastName = nameParts.slice(1).join(' ') || ''
     
     const payload = {
+      studentCode: editFormData.value.studentCode,
       firstName: firstName,
       lastName: lastName,
-      email: editFormData.value.email,
-      phone: editFormData.value.phone,
-      placeOfBirth: editFormData.value.address,
+      email: editFormData.value.email.trim(),
+      phone: editFormData.value.phone?.trim() || null,
+      placeOfBirth: editFormData.value.address?.trim() || null,
       classId: editFormData.value.classId,
-      status: editFormData.value.status,
-      profileImage: uploadedUrl,
+      status: editFormData.value.status?.toLowerCase() || 'active',
     }
     
-    await api.patch(`/api/students/${student.value.id}`, payload)
+    const updatedStudent = await store.updateStudent(student.value.id, payload, selectedStudentFile.value)
     
     student.value = { 
       ...editFormData.value,
-      avatar: uploadedUrl
+      avatar: updatedStudent?.profileImage || editFormData.value.avatar
     }
     showEditModal.value = false
-    
-    await store.fetchStudents()
+    toast.showToast('Student updated successfully!')
   } catch (err) {
     console.error('Failed to update student in database:', err)
-    
-    student.value = { 
-      ...editFormData.value,
-      avatar: uploadedUrl
-    }
-    showEditModal.value = false
-    
-    const idx = store.students.findIndex(s => s.id === student.value.id)
-    if (idx !== -1) {
-      const nameParts = student.value.name.trim().split(' ')
-      const firstName = nameParts[0] || ''
-      const lastName = nameParts.slice(1).join(' ') || ''
-      
-      const updated = {
-        ...store.students[idx],
-        firstName: firstName,
-        lastName: lastName,
-        name: student.value.name,
-        email: student.value.email,
-        phone: student.value.phone,
-        placeOfBirth: student.value.address,
-        status: student.value.status,
-        classId: student.value.classId,
-        profileImage: uploadedUrl,
-        updatedAt: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-      }
-      store.students[idx] = updated
-      localStorage.setItem('students_cache', JSON.stringify(store.students))
-    }
+    formErrors.value = { server: getErrorMessage(err, 'Failed to update student') }
   }
   
   selectedStudentFile.value = null
@@ -430,11 +394,15 @@ const handleSaveStudent = async () => {
 
           <!-- Avatar -->
           <div class="relative -mt-12 flex justify-center">
-            <img 
-              :src="student.avatar" 
-              class="w-20 h-20 rounded-full border-4 border-white object-cover shadow-sm"
-              :alt="student.name"
-            />
+            <div class="relative w-20 h-20 rounded-full border-4 border-white bg-slate-100 shadow-sm overflow-hidden flex items-center justify-center">
+               <IconUser class="absolute inset-0 m-auto w-10 h-10 text-slate-300" />
+               <img 
+                 :src="student.avatar" 
+                 @error="(e) => (e.target as HTMLImageElement).style.display = 'none'"
+                 class="relative z-10 w-full h-full object-cover"
+                 :alt="student.name"
+               />
+            </div>
           </div>
 
           <!-- Basic Info -->
@@ -869,6 +837,10 @@ const handleSaveStudent = async () => {
 
             <!-- Form -->
             <div class="px-4 py-3 space-y-3 text-left">
+              <!-- Server Error Banner -->
+              <div v-if="formErrors.server" class="mb-4 p-2.5 bg-red-50 border border-red-200 rounded-[3px] text-xs font-semibold text-red-700">
+                {{ formErrors.server }}
+              </div>
               <!-- Profile Image Uploader -->
               <div class="flex items-center gap-4 border-b border-slate-100 pb-3">
                 <div class="w-12 h-12 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
@@ -921,9 +893,7 @@ const handleSaveStudent = async () => {
                   v-model="editFormData.phone"
                   type="text" 
                   class="mt-1 w-full border border-slate-200 rounded-[5px] px-3 py-1.5 text-xs text-[#0f172a] focus:border-indigo-300 focus:outline-none transition-colors"
-                  :class="{ 'border-rose-300 focus:border-rose-400': formErrors.phone }"
                 />
-                <span v-if="formErrors.phone" class="text-[10px] font-bold text-rose-500 mt-0.5">{{ formErrors.phone }}</span>
               </div>
 
               <div>
@@ -932,9 +902,7 @@ const handleSaveStudent = async () => {
                   v-model="editFormData.address"
                   rows="2"
                   class="mt-1 w-full border border-slate-200 rounded-[5px] px-3 py-1.5 text-xs text-[#0f172a] focus:border-indigo-300 focus:outline-none transition-colors resize-none"
-                  :class="{ 'border-rose-300 focus:border-rose-400': formErrors.address }"
                 ></textarea>
-                <span v-if="formErrors.address" class="text-[10px] font-bold text-rose-500 mt-0.5">{{ formErrors.address }}</span>
               </div>
 
               <!-- Class & Status Selection -->

@@ -38,8 +38,11 @@ function cacheUser(u: UserProfile | null) {
 }
 
 function buildUser(data: UserProfile): UserProfile {
+  const email = data.email || ''
+  const localImage = email ? localStorage.getItem('cached_profile_image_' + email) : null
   return {
     ...data,
+    profile_image: localImage || data.profile_image || null,
     name: [data.first_name, data.last_name].filter((v): v is string => !!v).join(' ') || data.email || 'User',
   }
 }
@@ -52,10 +55,94 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       if (!isAuthenticated.value) return null
 
-      const response = await api.get('/api/users/profile')
-      if (response.data?.success) {
-        const data = response.data.data as UserProfile
-        user.value = buildUser(data)
+      let profileData: UserProfile | null = null
+
+      // Attempt 1: Try /users/profile endpoint
+      try {
+        const response = await api.get('/users/profile')
+        if (response.data) {
+          if (response.data.success && response.data.data) {
+            profileData = response.data.data as UserProfile
+          } else if (response.data.email) {
+            profileData = response.data as UserProfile
+          } else if (response.data.data && response.data.data.email) {
+            profileData = response.data.data as UserProfile
+          } else if (response.data.user_id) {
+            // If the staging server returns only the JWT payload (e.g. user_id, entity_type, roles)
+            profileData = response.data as UserProfile
+          } else if (response.data.data && response.data.data.user_id) {
+            profileData = response.data.data as UserProfile
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch from /users/profile, attempting fallback to /users list...', err)
+      }
+
+      // Check if profileData has names and email. If not, we need to fetch them from users list or heuristics.
+      const isComplete = !!(profileData && profileData.email && (profileData.first_name || profileData.last_name))
+
+      // Attempt 2: Fallback to /users endpoint if profileData is incomplete
+      const userEmail = localStorage.getItem('user_email')
+      if (!isComplete) {
+        try {
+          const response = await api.get('/users')
+          let usersList: Record<string, unknown>[] = []
+          if (response.data?.success && Array.isArray(response.data.data)) {
+            usersList = response.data.data as Record<string, unknown>[]
+          } else if (Array.isArray(response.data)) {
+            usersList = response.data as Record<string, unknown>[]
+          } else if (Array.isArray(response.data?.data)) {
+            usersList = response.data.data as Record<string, unknown>[]
+          }
+
+          // Match by user_id/id or email
+          const targetId = profileData?.user_id || profileData?.id
+          const found = usersList.find((u) => 
+            (targetId && String(u['id']) === targetId) || 
+            (userEmail && typeof u['email'] === 'string' && u['email'].toLowerCase() === userEmail.toLowerCase())
+          )
+          
+          if (found) {
+            // Keep roles and other fields from profileData if they are not in the found object
+            profileData = {
+              ...profileData,
+              ...found
+            } as UserProfile
+            console.log('Successfully retrieved complete user profile from users list for id:', targetId)
+          }
+        } catch (err) {
+          console.warn('Fallback to /users list failed:', err)
+        }
+      }
+
+      // Re-evaluate completeness
+      const isNowComplete = !!(profileData && profileData.email && (profileData.first_name || profileData.last_name))
+
+      // Attempt 3: Local heuristics fallback using email address if still incomplete
+      if (!isNowComplete && userEmail) {
+        const cached = loadCachedUser()
+        if (cached && cached.email === userEmail && cached.first_name) {
+          profileData = cached
+        } else {
+          // Parse name from email (e.g. superadmin@example.com -> Super Admin)
+          const namePart = userEmail.split('@')[0] || 'User'
+          const parts = namePart.split(/[\._-]/)
+          const first = parts[0] ? parts[0].charAt(0).toUpperCase() + parts[0].slice(1) : 'User'
+          const last = parts[1] ? parts[1].charAt(0).toUpperCase() + parts[1].slice(1) : ''
+          
+          profileData = {
+            ...profileData,
+            email: userEmail,
+            first_name: first,
+            last_name: last,
+            entity_type: profileData?.entity_type || (userEmail.includes('admin') ? 'admin' : 'user'),
+            roles: profileData?.roles || (userEmail.includes('admin') ? ['ADMIN'] : ['USER']),
+          }
+        }
+      }
+
+      if (profileData) {
+        user.value = buildUser(profileData)
         cacheUser(user.value)
         return user.value
       }
@@ -67,10 +154,22 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function login(credentials: { email: string; password: string }) {
     try {
-      const response = await api.post('/api/auth/login', credentials)
+      const response = await api.post('/auth/login', credentials)
+      let token: string | null = null
 
-      if (response.data?.success && response.data?.data?.access_token) {
-        const token = response.data.data.access_token
+      if (response.data) {
+        if (response.data.success && response.data.data?.access_token) {
+          token = response.data.data.access_token
+        } else if (response.data.access_token) {
+          token = response.data.access_token
+        } else if (response.data.data?.access_token) {
+          token = response.data.data.access_token
+        } else if (response.data.token) {
+          token = response.data.token
+        }
+      }
+
+      if (token) {
         localStorage.setItem('access_token', token)
         localStorage.setItem('user_email', credentials.email)
         isAuthenticated.value = true
@@ -89,6 +188,9 @@ export const useAuthStore = defineStore('auth', () => {
   function logout() {
     localStorage.removeItem('access_token')
     localStorage.removeItem('user_email')
+    localStorage.removeItem('students_cache')
+    localStorage.removeItem('teachers_cache')
+    localStorage.removeItem('user_profile')
     cacheUser(null)
     isAuthenticated.value = false
     user.value = null
@@ -104,5 +206,11 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // Auto-fetch profile on store initialization if token is present
+  if (isAuthenticated.value) {
+    fetchProfile()
+  }
+
   return { isAuthenticated, user, fetchProfile, login, logout, updateUserLocal }
 })
+

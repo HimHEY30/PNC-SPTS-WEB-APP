@@ -22,6 +22,8 @@
     "@tabler/icons-vue": "^3.44.0",
     "@tailwindcss/vite": "^4.3.0",
     "axios": "^1.17.0",
+    "express": "^5.2.1",
+    "multer": "^2.1.1",
     "pinia": "^3.0.3",
     "tailwindcss": "^4.3.0",
     "vue": "^3.5.18",
