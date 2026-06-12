@@ -31,10 +31,13 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      // Clear token and redirect to login if unauthorized
+      // Clear token and other cached credentials if unauthorized
       localStorage.removeItem('access_token');
-      // You could also trigger a router redirect here if necessary
-      // window.location.href = '/login'; 
+      localStorage.removeItem('user_profile');
+      localStorage.removeItem('user_email');
+      
+      // Redirect to login page
+      window.location.href = '/';
     }
     return Promise.reject(error);
   }

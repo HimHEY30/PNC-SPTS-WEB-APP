@@ -108,7 +108,25 @@ const formData = ref({
   email: '',
   role: '',
   status: 'Active' as 'Active' | 'Inactive',
+  profileImage: '',
 })
+
+const isRoleDropdownOpen = ref(false)
+const userFileInput = ref<HTMLInputElement | null>(null)
+const selectedUserFile = ref<File | null>(null)
+
+function onUserFileSelected(e: Event) {
+  const target = e.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+  selectedUserFile.value = file
+  
+  const reader = new FileReader()
+  reader.onload = () => {
+    formData.value.profileImage = reader.result as string
+  }
+  reader.readAsDataURL(file)
+}
 
 const formErrors = ref<Record<string, string>>({})
 const saving = ref(false)
@@ -116,8 +134,16 @@ const toggleLoading = ref<string | null>(null)
 
 const resetForm = () => {
   const defaultRole = store.rolesList[0]?.name ?? ''
-  formData.value = { first_name: '', last_name: '', password: '', email: '', role: defaultRole, status: 'Active' }
+  formData.value = { first_name: '', last_name: '', password: '', email: '', role: defaultRole, status: 'Active', profileImage: '' }
+  selectedUserFile.value = null
+  isRoleDropdownOpen.value = false
   formErrors.value = {}
+}
+
+const closeModal = () => {
+  showAddModal.value = false
+  showEditModal.value = false
+  resetForm()
 }
 
 const savingRoles = ref(false)
@@ -142,7 +168,10 @@ const openEditModal = (user: DisplayUser) => {
     email: user.email,
     role: user.role,
     status: user.status,
+    profileImage: user.profileImage ?? '',
   }
+  selectedUserFile.value = null
+  isRoleDropdownOpen.value = false
   formErrors.value = {}
   showEditModal.value = true
 }
@@ -161,14 +190,17 @@ const handleAdd = async () => {
   if (!validateForm()) return
   saving.value = true
   try {
-    await store.createUser({
-      first_name: formData.value.first_name,
-      last_name: formData.value.last_name,
-      email: formData.value.email,
-      password: formData.value.password,
-      role: formData.value.role,
-    })
-    showAddModal.value = false
+    await store.createUser(
+      {
+        first_name: formData.value.first_name,
+        last_name: formData.value.last_name,
+        email: formData.value.email,
+        password: formData.value.password,
+        role: formData.value.role,
+      },
+      selectedUserFile.value
+    )
+    closeModal()
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } }; message?: string }
     const msg = err?.response?.data?.message ?? err?.message ?? 'Failed to create user'
@@ -182,14 +214,18 @@ const handleEdit = async () => {
   if (!validateForm() || !selectedUser.value) return
   saving.value = true
   try {
-    await store.updateUser(selectedUser.value.id, {
-      first_name: formData.value.first_name,
-      last_name: formData.value.last_name,
-    })
+    await store.updateUser(
+      selectedUser.value.id,
+      {
+        first_name: formData.value.first_name,
+        last_name: formData.value.last_name,
+      },
+      selectedUserFile.value
+    )
     if (formData.value.role !== selectedUser.value.role) {
       await store.assignRole(selectedUser.value.id, formData.value.role)
     }
-    showEditModal.value = false
+    closeModal()
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } }; message?: string }
     const msg = err?.response?.data?.message ?? err?.message ?? 'Failed to update user'
@@ -237,9 +273,13 @@ const roleBadgeClass = (role: string) => {
   switch (role) {
     case 'SUPER_ADMIN':
     case 'ADMIN': return 'bg-purple-50 text-purple-700 border-purple-100'
+    case 'ACADEMIC_MANAGER':
     case 'MANAGER': return 'bg-blue-50 text-blue-700 border-blue-100'
-    case 'STAFF': return 'bg-slate-100 text-slate-600 border-slate-200'
-    default: return 'bg-slate-100 text-slate-600'
+    case 'FOLLOWUP_OFFICER':
+    case 'STAFF': return 'bg-rose-50 text-rose-700 border-rose-100'
+    case 'TUTOR': return 'bg-amber-50 text-amber-700 border-amber-100'
+    case 'STUDENT': return 'bg-emerald-50 text-emerald-700 border-emerald-100'
+    default: return 'bg-slate-100 text-slate-600 border-slate-200'
   }
 }
 </script>
@@ -444,18 +484,18 @@ const roleBadgeClass = (role: string) => {
         <div
           v-if="showAddModal || showEditModal"
           class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
-          @click="showAddModal = false; showEditModal = false"
+          @click="closeModal"
         >
           <div
-            class="w-full max-w-md bg-white rounded-[5px] shadow-xl overflow-hidden"
+            class="w-full max-w-md bg-white rounded-[5px] shadow-xl"
             @click.stop
           >
-            <div class="flex items-center justify-between px-4 py-3 border-b border-slate-50">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-slate-50 rounded-t-[5px]">
               <h2 class="text-base font-bold text-slate-900">
                 {{ showAddModal ? 'Add New User' : 'Edit User' }}
               </h2>
               <button
-                @click="showAddModal = false; showEditModal = false"
+                @click="closeModal"
                 class="p-1 rounded-[5px] text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
               >
                 <IconX class="h-4 w-4" />
@@ -464,6 +504,31 @@ const roleBadgeClass = (role: string) => {
 
             <div class="space-y-3 px-4 py-3">
               <p v-if="formErrors.api" class="rounded-[3px] bg-rose-50 border border-rose-200 px-3 py-1.5 text-[10px] font-bold text-rose-600">{{ formErrors.api }}</p>
+
+              <!-- Profile Image Uploader -->
+              <div class="flex items-center gap-4 border-b border-slate-50 pb-3">
+                <div class="w-12 h-12 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                  <img v-if="formData.profileImage" :src="formData.profileImage" class="h-full w-full object-cover" />
+                  <IconUser v-else class="w-6 h-6 text-slate-400" />
+                </div>
+                <div>
+                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Profile Image</label>
+                  <button 
+                    @click="userFileInput?.click()" 
+                    type="button"
+                    class="px-2.5 py-1 bg-white border border-slate-200 rounded-[3px] text-[10px] font-bold text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
+                  >
+                    Choose Photo
+                  </button>
+                  <input 
+                    ref="userFileInput" 
+                    type="file" 
+                    accept="image/*" 
+                    class="hidden" 
+                    @change="onUserFileSelected" 
+                  />
+                </div>
+              </div>
 
               <div class="grid grid-cols-2 gap-3">
                 <div>
@@ -502,7 +567,39 @@ const roleBadgeClass = (role: string) => {
                   />
                   <p v-if="formErrors.email" class="mt-0.5 text-[10px] font-bold text-rose-500">{{ formErrors.email }}</p>
                 </div>
-                <div v-if="showAddModal">
+
+                <!-- If EDIT, show Role here (making Row 2 have Email and Role) -->
+                <div v-if="!showAddModal" class="relative custom-dropdown-role" v-click-outside="() => isRoleDropdownOpen = false">
+                  <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Role</label>
+                  <button
+                    type="button"
+                    @click.stop="isRoleDropdownOpen = !isRoleDropdownOpen"
+                    class="mt-1 w-full rounded-[5px] border border-slate-200 px-3 py-1.5 text-xs text-slate-700 bg-white cursor-pointer select-none text-left flex items-center justify-between min-h-[32px] focus:outline-none focus:border-purple-300 transition-colors"
+                    :class="{ 'border-rose-300 focus:border-rose-400': formErrors.role }"
+                  >
+                    <span>{{ formData.role ? formData.role.charAt(0) + formData.role.slice(1).toLowerCase() : 'Select Role' }}</span>
+                    <IconChevronDown class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200" :class="{ 'rotate-180': isRoleDropdownOpen }" />
+                  </button>
+                  <div
+                    v-if="isRoleDropdownOpen"
+                    class="absolute left-0 right-0 mt-1 bg-white border border-slate-100 shadow-lg rounded-[5px] z-50 py-1 max-h-[140px] overflow-y-auto no-scrollbar"
+                  >
+                    <button
+                      v-for="r in store.rolesList"
+                      :key="r.name"
+                      type="button"
+                      @click="formData.role = r.name; isRoleDropdownOpen = false"
+                      class="w-full text-left px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:text-indigo-600 flex items-center justify-between transition-colors"
+                      :class="{ 'text-indigo-600 bg-indigo-50/30': formData.role === r.name }"
+                    >
+                      {{ r.name.charAt(0) + r.name.slice(1).toLowerCase() }}
+                    </button>
+                  </div>
+                  <p v-if="formErrors.role" class="mt-0.5 text-[10px] font-bold text-rose-500">{{ formErrors.role }}</p>
+                </div>
+
+                <!-- If ADD, show Password here (making Row 2 have Email and Password) -->
+                <div v-else>
                   <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Password</label>
                   <input
                     v-model="formData.password"
@@ -515,24 +612,42 @@ const roleBadgeClass = (role: string) => {
                 </div>
               </div>
 
-              <div>
-                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Role</label>
-                <div class="mt-1 flex flex-wrap items-center gap-4">
-                  <template v-if="store.rolesList.length > 0">
-                    <label v-for="r in store.rolesList" :key="r.name" class="flex items-center gap-1.5 cursor-pointer font-bold text-xs text-slate-700">
-                      <input v-model="formData.role" type="radio" :value="r.name" class="w-4 h-4 text-[#6366f1] focus:ring-[#6366f1]" />
-                      <span>{{ r.name.charAt(0) + r.name.slice(1).toLowerCase() }}</span>
-                    </label>
-                  </template>
-                  <p v-else class="text-xs font-bold text-slate-400">Loading roles...</p>
+              <!-- If ADD, show Role on Row 3 in a 2-column grid so it matches half-width alignment -->
+              <div v-if="showAddModal" class="grid grid-cols-2 gap-3">
+                <div class="relative custom-dropdown-role" v-click-outside="() => isRoleDropdownOpen = false">
+                  <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Role</label>
+                  <button
+                    type="button"
+                    @click.stop="isRoleDropdownOpen = !isRoleDropdownOpen"
+                    class="mt-1 w-full rounded-[5px] border border-slate-200 px-3 py-1.5 text-xs text-slate-700 bg-white cursor-pointer select-none text-left flex items-center justify-between min-h-[32px] focus:outline-none focus:border-purple-300 transition-colors"
+                    :class="{ 'border-rose-300 focus:border-rose-400': formErrors.role }"
+                  >
+                    <span>{{ formData.role ? formData.role.charAt(0) + formData.role.slice(1).toLowerCase() : 'Select Role' }}</span>
+                    <IconChevronDown class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200" :class="{ 'rotate-180': isRoleDropdownOpen }" />
+                  </button>
+                  <div
+                    v-if="isRoleDropdownOpen"
+                    class="absolute left-0 right-0 mt-1 bg-white border border-slate-100 shadow-lg rounded-[5px] z-50 py-1 max-h-[140px] overflow-y-auto no-scrollbar"
+                  >
+                    <button
+                      v-for="r in store.rolesList"
+                      :key="r.name"
+                      type="button"
+                      @click="formData.role = r.name; isRoleDropdownOpen = false"
+                      class="w-full text-left px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:text-indigo-600 flex items-center justify-between transition-colors"
+                      :class="{ 'text-indigo-600 bg-indigo-50/30': formData.role === r.name }"
+                    >
+                      {{ r.name.charAt(0) + r.name.slice(1).toLowerCase() }}
+                    </button>
+                  </div>
+                  <p v-if="formErrors.role" class="mt-0.5 text-[10px] font-bold text-rose-500">{{ formErrors.role }}</p>
                 </div>
-                <p v-if="formErrors.role" class="mt-0.5 text-[10px] font-bold text-rose-500">{{ formErrors.role }}</p>
               </div>
             </div>
 
-            <div class="px-4 py-3 bg-[#f8f9fa] border-t border-slate-50 flex items-center justify-end gap-2">
+            <div class="px-4 py-3 bg-[#f8f9fa] border-t border-slate-50 flex items-center justify-end gap-2 rounded-b-[5px]">
               <button
-                @click="showAddModal = false; showEditModal = false"
+                @click="closeModal"
                 class="px-4 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-[5px] text-xs font-bold text-slate-500 transition-colors shadow-sm"
               >
                 Cancel

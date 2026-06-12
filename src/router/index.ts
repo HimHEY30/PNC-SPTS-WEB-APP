@@ -21,6 +21,7 @@ const router = createRouter({
     {
       path: '/admin',
       component: AdminLayout,
+      meta: { requiresAuth: true },
       children: [
         {
           path: '',
@@ -99,7 +100,8 @@ const router = createRouter({
 
 router.beforeEach((to, _from, next) => {
   const auth = useAuthStore()
-  if (to.meta.requiresAuth && !auth.isAuthenticated) {
+  const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
+  if (requiresAuth && !auth.isAuthenticated) {
     next('/')
   } else {
     next()

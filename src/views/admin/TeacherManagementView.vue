@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, inject, type Ref } from 'vue'
+import { ref, computed, inject, onMounted, type Ref } from 'vue'
 import {
   IconSearch,
   IconPlus,
@@ -8,58 +8,36 @@ import {
   IconX,
   IconMail,
   IconPhone,
-  IconBooks,
-  IconCategory,
   IconCircleDot,
   IconArrowsSort,
   IconChevronDown,
   IconUserPlus,
+  IconId,
+  IconUser,
 } from '@tabler/icons-vue'
 import BaseDropdown from '@/components/ui/dropdowns/BaseDropdown.vue'
 import type { DropdownOption } from '@/components/ui/dropdowns/BaseDropdown.vue'
+import { useTeachersStore, type DisplayTeacher } from '@/stores/teachers'
 
-interface Teacher {
-  id: number
-  name: string
-  email: string
-  phone: string
-  department: string
-  sections: number
-  students: number
-  status: 'Active' | 'Inactive'
-  joinedAt: string
-}
+const teachersStore = useTeachersStore()
 
-const teachers = ref<Teacher[]>([
-  { id: 1, name: 'Ms. Chantrea Keo', email: 'chantrea.k@pnc.edu.kh', phone: '+855 12 345 678', department: 'Web Development', sections: 3, students: 72, status: 'Active', joinedAt: '2025-01-15' },
-  { id: 2, name: 'Mr. Dara Heng', email: 'dara.h@pnc.edu.kh', phone: '+855 98 765 432', department: 'Data Science', sections: 2, students: 48, status: 'Active', joinedAt: '2025-03-01' },
-  { id: 3, name: 'Ms. Theary Sok', email: 'theary.s@pnc.edu.kh', phone: '+855 77 123 456', department: 'Mobile Dev', sections: 2, students: 54, status: 'Active', joinedAt: '2024-08-20' },
-  { id: 4, name: 'Mr. Vuthy Long', email: 'vuthy.l@pnc.edu.kh', phone: '+855 92 334 556', department: 'Web Development', sections: 2, students: 51, status: 'Inactive', joinedAt: '2023-06-10' },
-  { id: 5, name: 'Ms. Kanha Phan', email: 'kanha.p@pnc.edu.kh', phone: '+855 81 445 667', department: 'DevOps', sections: 1, students: 28, status: 'Active', joinedAt: '2025-09-01' },
-  { id: 6, name: 'Mr. Samnang Tep', email: 'samnang.t@pnc.edu.kh', phone: '+855 15 556 778', department: 'Cyber Security', sections: 2, students: 44, status: 'Active', joinedAt: '2024-11-15' },
-  { id: 7, name: 'Mr. Rithy Chhum', email: 'rithy.c@pnc.edu.kh', phone: '+855 96 667 889', department: 'Data Science', sections: 1, students: 23, status: 'Active', joinedAt: '2026-01-05' },
-  { id: 8, name: 'Ms. Socheata Lim', email: 'socheata.l@pnc.edu.kh', phone: '+855 88 778 990', department: 'AI & ML', sections: 2, students: 36, status: 'Inactive', joinedAt: '2024-05-20' },
-])
+onMounted(() => {
+  teachersStore.fetchTeachers()
+})
+
+const teachers = computed(() => teachersStore.teachers)
+const loading = computed(() => teachersStore.loading)
+const error = computed(() => teachersStore.error)
 
 const searchQuery = inject<Ref<string>>('searchQuery', ref(''))
-const selectedDepartment = ref('')
 const selectedStatus = ref('')
 const selectedSort = ref('name')
 
-const uniqueDepartments = computed(() => [...new Set(teachers.value.map(t => t.department))])
-
-const deptCounts = computed(() => {
-  const counts: Record<string, number> = { all: teachers.value.length }
-  teachers.value.forEach(t => {
-    counts[t.department] = (counts[t.department] || 0) + 1
-  })
-  return counts
-})
-
-const deptOptions = computed<DropdownOption[]>(() => [
-  { value: '', label: 'All Departments', count: deptCounts.value.all },
-  ...uniqueDepartments.value.map(d => ({ value: d, label: d, count: deptCounts.value[d] })),
-])
+const statusCounts = computed(() => ({
+  all: teachers.value.length,
+  Active: teachers.value.filter(t => t.status === 'Active').length,
+  Inactive: teachers.value.filter(t => t.status === 'Inactive').length,
+}))
 
 const statusOptions = computed<DropdownOption[]>(() => [
   { value: '', label: 'All Status', count: statusCounts.value.all },
@@ -74,21 +52,16 @@ const sortOptions: DropdownOption[] = [
   { value: 'joined', label: 'Join Date' },
 ]
 
-const statusCounts = computed(() => ({
-  all: teachers.value.length,
-  Active: teachers.value.filter(t => t.status === 'Active').length,
-  Inactive: teachers.value.filter(t => t.status === 'Inactive').length,
-}))
-
 const filteredTeachers = computed(() => {
   let result = teachers.value
 
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase()
-    result = result.filter(t => t.name.toLowerCase().includes(q) || t.email.toLowerCase().includes(q))
-  }
-  if (selectedDepartment.value) {
-    result = result.filter(t => t.department === selectedDepartment.value)
+    result = result.filter(t =>
+      t.name.toLowerCase().includes(q) ||
+      t.email.toLowerCase().includes(q) ||
+      t.teacherCode.toLowerCase().includes(q)
+    )
   }
   if (selectedStatus.value) {
     result = result.filter(t => t.status === selectedStatus.value)
@@ -108,22 +81,48 @@ const filteredTeachers = computed(() => {
 const showAddModal = ref(false)
 const showEditModal = ref(false)
 const showDeleteConfirm = ref(false)
-const selectedTeacher = ref<Teacher | null>(null)
-const deleteTarget = ref<Teacher | null>(null)
+const selectedTeacher = ref<DisplayTeacher | null>(null)
+const deleteTarget = ref<DisplayTeacher | null>(null)
 
-const formData = ref<Partial<Teacher>>({
-  name: '',
+const formData = ref({
+  teacherCode: '',
+  firstName: '',
+  lastName: '',
   email: '',
   phone: '',
-  department: '',
-  sections: 0,
-  status: 'Active',
+  status: true,
+  profileImage: '',
 })
+
+const teacherFileInput = ref<HTMLInputElement | null>(null)
+const selectedTeacherFile = ref<File | null>(null)
+
+function onTeacherFileSelected(e: Event) {
+  const target = e.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+  selectedTeacherFile.value = file
+
+  const reader = new FileReader()
+  reader.onload = () => {
+    formData.value.profileImage = reader.result as string
+  }
+  reader.readAsDataURL(file)
+}
 
 const formErrors = ref<Record<string, string>>({})
 
 const resetForm = () => {
-  formData.value = { name: '', email: '', phone: '', department: '', sections: 0, status: 'Active' }
+  formData.value = {
+    teacherCode: '',
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    status: true,
+    profileImage: '',
+  }
+  selectedTeacherFile.value = null
   formErrors.value = {}
 }
 
@@ -132,69 +131,105 @@ const openAddModal = () => {
   showAddModal.value = true
 }
 
-const openEditModal = (teacher: Teacher) => {
+const openEditModal = (teacher: DisplayTeacher) => {
   selectedTeacher.value = teacher
-  formData.value = { ...teacher }
+  formData.value = {
+    teacherCode: teacher.teacherCode,
+    firstName: teacher.firstName,
+    lastName: teacher.lastName,
+    email: teacher.email === '—' ? '' : teacher.email,
+    phone: teacher.phone === '—' ? '' : teacher.phone,
+    status: teacher.status === 'Active',
+    profileImage: teacher.profileImage ?? '',
+  }
+  selectedTeacherFile.value = null
   formErrors.value = {}
   showEditModal.value = true
 }
 
+const closeModal = () => {
+  showAddModal.value = false
+  showEditModal.value = false
+  resetForm()
+}
+
 const validateForm = (): boolean => {
   formErrors.value = {}
-  if (!formData.value.name?.trim()) formErrors.value.name = 'Name is required'
-  if (!formData.value.email?.trim()) formErrors.value.email = 'Email is required'
-  if (!formData.value.phone?.trim()) formErrors.value.phone = 'Phone is required'
-  if (!formData.value.department?.trim()) formErrors.value.department = 'Department is required'
+  if (!formData.value.teacherCode?.trim()) formErrors.value.teacherCode = 'Teacher Code is required'
+  if (!formData.value.firstName?.trim()) formErrors.value.firstName = 'First name is required'
+  if (!formData.value.lastName?.trim()) formErrors.value.lastName = 'Last name is required'
+  if (!formData.value.email?.trim()) {
+    formErrors.value.email = 'Email is required'
+  } else if (!/\S+@\S+\.\S+/.test(formData.value.email)) {
+    formErrors.value.email = 'Invalid email address'
+  }
   return Object.keys(formErrors.value).length === 0
 }
 
-const handleAdd = () => {
+const handleAdd = async () => {
   if (!validateForm()) return
-  teachers.value.push({
-    id: Date.now(),
-    name: formData.value.name!,
-    email: formData.value.email!,
-    phone: formData.value.phone!,
-    department: formData.value.department!,
-    sections: formData.value.sections || 0,
-    students: 0,
-    status: formData.value.status as 'Active' | 'Inactive',
-    joinedAt: new Date().toISOString().split('T')[0],
-  })
-  showAddModal.value = false
-}
-
-const handleEdit = () => {
-  if (!validateForm() || !selectedTeacher.value) return
-  const idx = teachers.value.findIndex(t => t.id === selectedTeacher.value!.id)
-  if (idx !== -1) {
-    teachers.value[idx] = {
-      ...teachers.value[idx],
-      name: formData.value.name!,
-      email: formData.value.email!,
-      phone: formData.value.phone!,
-      department: formData.value.department!,
-      sections: formData.value.sections || 0,
-      status: formData.value.status as 'Active' | 'Inactive',
-    }
+  try {
+    await teachersStore.createTeacher(
+      {
+        teacherCode: formData.value.teacherCode,
+        firstName: formData.value.firstName,
+        lastName: formData.value.lastName,
+        email: formData.value.email,
+        phone: formData.value.phone || undefined,
+        status: formData.value.status,
+      },
+      selectedTeacherFile.value
+    )
+    closeModal()
+  } catch (err: any) {
+    formErrors.value.general = err?.response?.data?.message || err?.message || 'Failed to add teacher'
   }
-  showEditModal.value = false
 }
 
-const openDeleteConfirm = (teacher: Teacher) => {
+const handleEdit = async () => {
+  if (!validateForm() || !selectedTeacher.value) return
+  try {
+    await teachersStore.updateTeacher(
+      selectedTeacher.value.id,
+      {
+        firstName: formData.value.firstName,
+        lastName: formData.value.lastName,
+        email: formData.value.email,
+        phone: formData.value.phone || undefined,
+        status: formData.value.status,
+      },
+      selectedTeacherFile.value
+    )
+    closeModal()
+  } catch (err: any) {
+    formErrors.value.general = err?.response?.data?.message || err?.message || 'Failed to save changes'
+  }
+}
+
+const openDeleteConfirm = (teacher: DisplayTeacher) => {
   deleteTarget.value = teacher
   showDeleteConfirm.value = true
 }
 
-const handleDelete = () => {
+const handleDelete = async () => {
   if (!deleteTarget.value) return
-  teachers.value = teachers.value.filter(t => t.id !== deleteTarget.value!.id)
-  showDeleteConfirm.value = false
-  deleteTarget.value = null
+  try {
+    await teachersStore.deleteTeacher(deleteTarget.value.id)
+    showDeleteConfirm.value = false
+    deleteTarget.value = null
+  } catch (err: any) {
+    console.error(err)
+  }
 }
 
-const toggleStatus = (teacher: Teacher) => {
-  teacher.status = teacher.status === 'Active' ? 'Inactive' : 'Active'
+const toggleStatus = async (teacher: DisplayTeacher) => {
+  try {
+    await teachersStore.updateTeacher(teacher.id, {
+      status: teacher.status !== 'Active',
+    })
+  } catch (err: any) {
+    console.error(err)
+  }
 }
 </script>
 
@@ -202,10 +237,12 @@ const toggleStatus = (teacher: Teacher) => {
   <div class="space-y-6 text-left">
     <!-- Header / Total count row -->
     <div class="flex items-center justify-between">
-      <p class="text-xs font-bold text-slate-400 uppercase tracking-wider select-none">{{ teachers.length }} teachers total</p>
+      <p class="text-xs font-bold text-slate-400 uppercase tracking-wider select-none">
+        {{ teachers.length }} teachers total
+      </p>
       <button
         @click="openAddModal"
-        class="inline-flex items-center gap-2 rounded-[5px] bg-[#3b4b6b] px-4 py-2 text-xs font-bold text-white hover:bg-[#2e3b54] transition-colors shadow-sm"
+        class="inline-flex items-center gap-2 rounded-[5px] bg-[#3b4b6b] px-4 py-2 text-xs font-bold text-white hover:bg-[#2e3b54] transition-colors shadow-sm cursor-pointer"
       >
         <IconPlus class="h-4 w-4" />
         Add Teacher
@@ -219,26 +256,33 @@ const toggleStatus = (teacher: Teacher) => {
         <input
           v-model="searchQuery"
           type="text"
-          placeholder="Search by name or email..."
+          placeholder="Search by name, email or teacher code..."
           class="w-full bg-[#f1f3f9] text-[#1e293b] rounded-[5px] py-1.5 pl-8 pr-3 text-xs border border-transparent outline-none focus:bg-[#f1f3f9]"
         />
         <IconSearch class="w-4 h-4 text-[#94a3b8] absolute left-3 top-1/2 -translate-y-1/2" />
       </div>
 
-      <BaseDropdown v-model="selectedDepartment" :options="deptOptions" :icon="IconCategory" placeholder="All Departments" />
       <BaseDropdown v-model="selectedStatus" :options="statusOptions" :icon="IconCircleDot" placeholder="All Status" />
       <BaseDropdown v-model="selectedSort" :options="sortOptions" :icon="IconArrowsSort" placeholder="Sort" />
     </div>
 
+    <!-- Error Alert -->
+    <div v-if="error" class="p-3 bg-rose-50 border border-rose-100 rounded-[5px] text-xs font-bold text-rose-600 flex items-center justify-between">
+      <span>{{ error }}</span>
+      <button @click="teachersStore.error = null" class="text-rose-400 hover:text-rose-600">
+        <IconX class="h-4 w-4" />
+      </button>
+    </div>
+
     <!-- Clean table using rounded-[5px] containers and CRM styling (Compact) -->
     <div class="overflow-hidden rounded-[5px] bg-white border border-slate-100 shadow-md">
-      <div class="overflow-x-auto">
+      <div class="overflow-x-auto no-scrollbar">
         <table class="w-full text-left border-collapse">
           <thead>
             <tr class="border-b border-slate-100">
               <th class="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Teacher</th>
+              <th class="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Code</th>
               <th class="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Contact</th>
-              <th class="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Department</th>
               <th class="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">Sections</th>
               <th class="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">Students</th>
               <th class="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status</th>
@@ -254,8 +298,9 @@ const toggleStatus = (teacher: Teacher) => {
               <!-- Name & join date details -->
               <td class="px-4 py-2.5">
                 <div class="flex items-center gap-2.5">
-                  <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-700 text-xs font-bold select-none uppercase shadow-inner">
-                    {{ teacher.name.split(' ').slice(-1)[0]?.charAt(0) }}{{ teacher.name.split(' ').slice(-1)[0]?.charAt(1) }}
+                  <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-700 text-xs font-bold select-none uppercase shadow-inner overflow-hidden border border-slate-200">
+                    <img v-if="teacher.profileImage" :src="teacher.profileImage" class="h-full w-full object-cover animate-fade-in" alt="" />
+                    <span v-else>{{ teacher.lastName.charAt(0) }}{{ teacher.firstName.charAt(0) }}</span>
                   </div>
                   <div>
                     <p class="font-bold text-xs text-[#475569] group-hover:text-[#0f172a] transition-colors leading-tight">
@@ -266,6 +311,14 @@ const toggleStatus = (teacher: Teacher) => {
                 </div>
               </td>
               
+              <!-- Code -->
+              <td class="px-4 py-2.5 text-xs font-bold">
+                <div class="flex items-center gap-1">
+                  <IconId class="h-3.5 w-3.5 text-slate-400" />
+                  <span class="font-mono text-[#475569] bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5">{{ teacher.teacherCode }}</span>
+                </div>
+              </td>
+
               <!-- Contact details -->
               <td class="px-4 py-2.5 text-xs font-bold text-slate-500">
                 <div class="space-y-1">
@@ -277,14 +330,6 @@ const toggleStatus = (teacher: Teacher) => {
                     <IconPhone class="h-3.5 w-3.5 text-slate-400" />
                     <span>{{ teacher.phone }}</span>
                   </div>
-                </div>
-              </td>
- 
-              <!-- Department -->
-              <td class="px-4 py-2.5 text-xs font-bold text-[#475569]">
-                <div class="flex items-center gap-1.5">
-                  <IconBooks class="h-3.5 w-3.5 text-slate-400" />
-                  <span>{{ teacher.department }}</span>
                 </div>
               </td>
  
@@ -304,11 +349,11 @@ const toggleStatus = (teacher: Teacher) => {
               <td class="px-4 py-2.5">
                 <button
                   @click="toggleStatus(teacher)"
-                  class="inline-flex items-center gap-1.5 rounded-[3px] px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-all select-none"
+                  class="inline-flex items-center gap-1.5 rounded-[3px] px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-all select-none cursor-pointer"
                   :class="
                     teacher.status === 'Active'
                       ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                      : 'bg-slate-100 text-slate-500'
+                      : 'bg-slate-100 text-slate-500 border border-slate-200'
                   "
                 >
                   <span
@@ -324,14 +369,14 @@ const toggleStatus = (teacher: Teacher) => {
                 <div class="flex items-center justify-end gap-2">
                   <button
                     @click="openEditModal(teacher)"
-                    class="w-7 h-7 rounded-[5px] border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
+                    class="w-7 h-7 rounded-[5px] border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all shadow-sm cursor-pointer"
                     title="Edit"
                   >
                     <IconEdit class="h-4 w-4" />
                   </button>
                   <button
                     @click="openDeleteConfirm(teacher)"
-                    class="w-7 h-7 rounded-[5px] border border-slate-200 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50/50 transition-all shadow-sm"
+                    class="w-7 h-7 rounded-[5px] border border-slate-200 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50/50 transition-all shadow-sm cursor-pointer"
                     title="Delete"
                   >
                     <IconTrash class="h-4 w-4" />
@@ -344,7 +389,7 @@ const toggleStatus = (teacher: Teacher) => {
               <td colspan="7" class="px-4 py-12 text-center">
                 <IconUserPlus class="mx-auto h-10 w-10 text-slate-300" />
                 <p class="mt-2 text-xs font-bold text-slate-500">No teachers found</p>
-                <p class="text-[10px] text-slate-400 mt-0.5">Try adjusting your search query or dropdown filters</p>
+                <p class="text-[10px] text-slate-400 mt-0.5">Try adjusting your search query or status filter</p>
               </td>
             </tr>
           </tbody>
@@ -352,7 +397,7 @@ const toggleStatus = (teacher: Teacher) => {
       </div>
     </div>
  
-    <!-- Pagination -->
+    <!-- Pagination (Static matching design) -->
     <div class="flex items-center justify-between text-[10px] font-bold text-slate-400 select-none">
       <p>Showing {{ filteredTeachers.length }} of {{ teachers.length }} teachers</p>
       <div class="flex items-center gap-1.5">
@@ -360,7 +405,6 @@ const toggleStatus = (teacher: Teacher) => {
           <IconChevronDown class="h-4 w-4 rotate-90" />
         </button>
         <button class="w-7 h-7 rounded-[5px] bg-[#3b4b6b] flex items-center justify-center text-white font-bold text-xs">1</button>
-        <button class="w-7 h-7 rounded-[5px] border border-slate-100 bg-white flex items-center justify-center text-slate-400 hover:bg-slate-50 text-xs font-bold">2</button>
         <button class="w-7 h-7 rounded-[5px] border border-slate-100 bg-white flex items-center justify-center text-slate-400 hover:bg-slate-50">
           <IconChevronDown class="h-4 w-4 -rotate-90" />
         </button>
@@ -380,20 +424,20 @@ const toggleStatus = (teacher: Teacher) => {
         <div
           v-if="showAddModal || showEditModal"
           class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
-          @click="showAddModal = false; showEditModal = false"
+          @click="closeModal"
         >
           <div
-            class="w-full max-w-md bg-white rounded-[5px] shadow-xl overflow-hidden"
+            class="w-full max-w-md bg-white rounded-[5px] shadow-xl overflow-hidden animate-fade-in-scale"
             @click.stop
           >
             <!-- Modal Header -->
-            <div class="flex items-center justify-between px-4 py-3 border-b border-slate-50">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100">
               <h2 class="text-base font-bold text-slate-900">
                 {{ showAddModal ? 'Add New Teacher' : 'Edit Teacher' }}
               </h2>
               <button
-                @click="showAddModal = false; showEditModal = false"
-                class="p-1 rounded-[5px] text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
+                @click="closeModal"
+                class="p-1 rounded-[5px] text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors cursor-pointer"
               >
                 <IconX class="h-4 w-4" />
               </button>
@@ -401,16 +445,72 @@ const toggleStatus = (teacher: Teacher) => {
 
             <!-- Modal Form -->
             <div class="space-y-3 px-4 py-3">
+              <!-- General Error Alert -->
+              <div v-if="formErrors.general" class="p-2 bg-rose-50 border border-rose-100 rounded-[5px] text-[10px] font-bold text-rose-600">
+                {{ formErrors.general }}
+              </div>
+
+              <!-- Profile Image Uploader -->
+              <div class="flex items-center gap-4 border-b border-slate-100 pb-3">
+                <div class="w-12 h-12 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                  <img v-if="formData.profileImage" :src="formData.profileImage" class="h-full w-full object-cover" />
+                  <IconUser v-else class="w-6 h-6 text-slate-400" />
+                </div>
+                <div>
+                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Profile Image</label>
+                  <button 
+                    @click="teacherFileInput?.click()" 
+                    type="button"
+                    class="px-2.5 py-1 bg-white border border-slate-200 rounded-[5px] text-[10px] font-bold text-slate-600 hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
+                  >
+                    Choose Photo
+                  </button>
+                  <input 
+                    ref="teacherFileInput" 
+                    type="file" 
+                    accept="image/*" 
+                    class="hidden" 
+                    @change="onTeacherFileSelected" 
+                  />
+                </div>
+              </div>
+
               <div>
-                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Full Name</label>
+                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Teacher Code</label>
                 <input
-                  v-model="formData.name"
+                  v-model="formData.teacherCode"
                   type="text"
-                  placeholder="e.g., Ms. Chantrea Keo"
-                  class="mt-1 w-full border border-slate-200 rounded-[5px] px-3 py-1.5 text-xs text-[#0f172a] focus:border-purple-300 focus:outline-none transition-colors"
-                  :class="{ 'border-rose-300 focus:border-rose-400': formErrors.name }"
+                  placeholder="e.g., TCH-001"
+                  :disabled="showEditModal"
+                  class="mt-1 w-full border border-slate-200 rounded-[5px] px-3 py-1.5 text-xs text-[#0f172a] focus:border-purple-300 focus:outline-none transition-colors disabled:bg-slate-50 disabled:text-slate-400"
+                  :class="{ 'border-rose-300 focus:border-rose-400': formErrors.teacherCode }"
                 />
-                <p v-if="formErrors.name" class="mt-0.5 text-[10px] font-bold text-rose-500">{{ formErrors.name }}</p>
+                <p v-if="formErrors.teacherCode" class="mt-0.5 text-[10px] font-bold text-rose-500">{{ formErrors.teacherCode }}</p>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">First Name</label>
+                  <input
+                    v-model="formData.firstName"
+                    type="text"
+                    placeholder="Chantrea"
+                    class="mt-1 w-full border border-slate-200 rounded-[5px] px-3 py-1.5 text-xs text-[#0f172a] focus:border-purple-300 focus:outline-none transition-colors"
+                    :class="{ 'border-rose-300 focus:border-rose-400': formErrors.firstName }"
+                  />
+                  <p v-if="formErrors.firstName" class="mt-0.5 text-[10px] font-bold text-rose-500">{{ formErrors.firstName }}</p>
+                </div>
+                <div>
+                  <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Last Name</label>
+                  <input
+                    v-model="formData.lastName"
+                    type="text"
+                    placeholder="Keo"
+                    class="mt-1 w-full border border-slate-200 rounded-[5px] px-3 py-1.5 text-xs text-[#0f172a] focus:border-purple-300 focus:outline-none transition-colors"
+                    :class="{ 'border-rose-300 focus:border-rose-400': formErrors.lastName }"
+                  />
+                  <p v-if="formErrors.lastName" class="mt-0.5 text-[10px] font-bold text-rose-500">{{ formErrors.lastName }}</p>
+                </div>
               </div>
 
               <div class="grid grid-cols-2 gap-3">
@@ -419,7 +519,7 @@ const toggleStatus = (teacher: Teacher) => {
                   <input
                     v-model="formData.email"
                     type="email"
-                    placeholder="teacher@pnc.edu.kh"
+                    placeholder="chantrea.keo@pnc.edu.kh"
                     class="mt-1 w-full border border-slate-200 rounded-[5px] px-3 py-1.5 text-xs text-[#0f172a] focus:border-purple-300 focus:outline-none transition-colors"
                     :class="{ 'border-rose-300 focus:border-rose-400': formErrors.email }"
                   />
@@ -438,46 +538,23 @@ const toggleStatus = (teacher: Teacher) => {
                 </div>
               </div>
 
-              <div class="grid grid-cols-2 gap-3">
-                <div>
-                  <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Department</label>
-                  <input
-                    v-model="formData.department"
-                    type="text"
-                    placeholder="e.g., Web Development"
-                    class="mt-1 w-full border border-slate-200 rounded-[5px] px-3 py-1.5 text-xs text-[#0f172a] focus:border-purple-300 focus:outline-none transition-colors"
-                    :class="{ 'border-rose-300 focus:border-rose-400': formErrors.department }"
-                  />
-                  <p v-if="formErrors.department" class="mt-0.5 text-[10px] font-bold text-rose-500">{{ formErrors.department }}</p>
-                </div>
-                <div>
-                  <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Sections</label>
-                  <input
-                    v-model.number="formData.sections"
-                    type="number"
-                    min="0"
-                    class="mt-1 w-full border border-slate-200 rounded-[5px] px-3 py-1.5 text-xs text-[#0f172a] focus:border-purple-300 focus:outline-none transition-colors"
-                  />
-                </div>
-              </div>
-
               <div>
                 <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Status</label>
                 <div class="flex items-center gap-4">
-                  <label class="flex items-center gap-1.5 cursor-pointer font-bold text-xs text-slate-700">
+                  <label class="flex items-center gap-1.5 cursor-pointer font-bold text-xs text-slate-700 select-none">
                     <input
                       v-model="formData.status"
                       type="radio"
-                      value="Active"
+                      :value="true"
                       class="w-4 h-4 text-[#6366f1] focus:ring-[#6366f1]"
                     />
                     <span>Active</span>
                   </label>
-                  <label class="flex items-center gap-1.5 cursor-pointer font-bold text-xs text-slate-700">
+                  <label class="flex items-center gap-1.5 cursor-pointer font-bold text-xs text-slate-700 select-none">
                     <input
                       v-model="formData.status"
                       type="radio"
-                      value="Inactive"
+                      :value="false"
                       class="w-4 h-4 text-[#6366f1] focus:ring-[#6366f1]"
                     />
                     <span>Inactive</span>
@@ -487,16 +564,16 @@ const toggleStatus = (teacher: Teacher) => {
             </div>
 
             <!-- Modal Footer -->
-            <div class="px-4 py-3 bg-[#f8f9fa] border-t border-slate-50 flex items-center justify-end gap-2">
+            <div class="px-4 py-3 bg-[#f8f9fa] border-t border-slate-100 flex items-center justify-end gap-2">
               <button
-                @click="showAddModal = false; showEditModal = false"
-                class="px-4 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-[5px] text-xs font-bold text-slate-500 transition-colors shadow-sm"
+                @click="closeModal"
+                class="px-4 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-[5px] text-xs font-bold text-slate-500 transition-colors shadow-sm cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 @click="showAddModal ? handleAdd() : handleEdit()"
-                class="px-4 py-1.5 bg-[#1e1b4b] hover:bg-[#2e3b54] text-white font-bold text-xs rounded-[5px] transition-colors shadow-sm"
+                class="px-4 py-1.5 bg-[#1e1b4b] hover:bg-[#2e3b54] text-white font-bold text-xs rounded-[5px] transition-colors shadow-sm cursor-pointer"
               >
                 {{ showAddModal ? 'Add Teacher' : 'Save Changes' }}
               </button>
@@ -526,7 +603,7 @@ const toggleStatus = (teacher: Teacher) => {
               <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-red-50">
                 <IconTrash class="h-5 w-5 text-red-500" />
               </div>
-              <h3 class="text-base font-bold text-slate-900">Delete Teacher</h3>
+              <h3 class="text-base font-bold text-slate-900 mt-2">Delete Teacher</h3>
               <p class="mt-1.5 text-xs font-bold text-slate-500 leading-relaxed">
                 Are you sure you want to remove
                 <span class="font-extrabold text-[#0f172a]">{{ deleteTarget?.name }}</span>?
@@ -536,13 +613,13 @@ const toggleStatus = (teacher: Teacher) => {
             <div class="flex items-center gap-2 px-4 py-3 bg-slate-50 border-t border-slate-100">
               <button
                 @click="showDeleteConfirm = false"
-                class="flex-1 px-4 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-[5px] text-xs font-bold text-slate-500 transition-colors shadow-sm"
+                class="flex-1 px-4 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-[5px] text-xs font-bold text-slate-500 transition-colors shadow-sm cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 @click="handleDelete"
-                class="flex-1 px-4 py-1.5 bg-[#1e1b4b] hover:bg-[#2e3b54] text-white font-bold text-xs rounded-[5px] transition-colors shadow-sm"
+                class="flex-1 px-4 py-1.5 bg-[#1e1b4b] hover:bg-[#2e3b54] text-white font-bold text-xs rounded-[5px] transition-colors shadow-sm cursor-pointer"
               >
                 Delete
               </button>

@@ -20,6 +20,11 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('error', (err) => {
+            console.error('[Vite Proxy] Backend unavailable:', err.message)
+          })
+        },
       },
       '/uploads': {
         target: 'http://localhost:3000',

@@ -94,5 +94,15 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
   }
 
-  return { isAuthenticated, user, fetchProfile, login, logout }
+  function updateUserLocal(data: Partial<UserProfile>) {
+    if (user.value) {
+      user.value = buildUser({
+        ...user.value,
+        ...data,
+      })
+      cacheUser(user.value)
+    }
+  }
+
+  return { isAuthenticated, user, fetchProfile, login, logout, updateUserLocal }
 })

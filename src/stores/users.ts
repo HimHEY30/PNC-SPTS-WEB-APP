@@ -100,26 +100,54 @@ export const useUsersStore = defineStore('users', () => {
     }
   }
 
-  async function createUser(payload: {
-    first_name: string
-    last_name: string
-    email: string
-    password: string
-    role: string
-    phone?: string
-  }) {
-    const response = await api.post('/api/users', payload)
+  async function createUser(
+    payload: {
+      first_name: string
+      last_name: string
+      email: string
+      password: string
+      role: string
+      phone?: string
+    },
+    imageFile?: File | null
+  ) {
+    let data: any = payload
+    if (imageFile) {
+      const fd = new FormData()
+      fd.append('first_name', payload.first_name)
+      fd.append('last_name', payload.last_name)
+      fd.append('email', payload.email)
+      fd.append('password', payload.password)
+      fd.append('role', payload.role)
+      if (payload.phone) fd.append('phone', payload.phone)
+      fd.append('image', imageFile)
+      data = fd
+    }
+    const response = await api.post('/api/users', data)
     const created: ApiUser = response.data?.data ?? response.data
     users.value.unshift(toDisplayUser(created))
     return created
   }
 
-  async function updateUser(id: string, payload: {
-    first_name?: string
-    last_name?: string
-    phone?: string
-  }) {
-    const response = await api.patch(`/api/users/${id}`, payload)
+  async function updateUser(
+    id: string,
+    payload: {
+      first_name?: string
+      last_name?: string
+      phone?: string
+    },
+    imageFile?: File | null
+  ) {
+    let data: any = payload
+    if (imageFile) {
+      const fd = new FormData()
+      if (payload.first_name) fd.append('first_name', payload.first_name)
+      if (payload.last_name) fd.append('last_name', payload.last_name)
+      if (payload.phone) fd.append('phone', payload.phone)
+      fd.append('image', imageFile)
+      data = fd
+    }
+    const response = await api.patch(`/api/users/${id}`, data)
     const updated: ApiUser = response.data?.data ?? response.data
     const idx = users.value.findIndex(u => u.id === id)
     if (idx !== -1) users.value[idx] = toDisplayUser(updated)

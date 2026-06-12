@@ -14,15 +14,10 @@ import {
   IconGlobe,
   IconChevronRight,
   IconChevronLeft,
-  IconLogout,
 } from '@tabler/icons-vue'
-import { useAuthStore } from '@/stores/auth'
-import { useRouter } from 'vue-router'
 import logoSrc from '@/assets/images/logo1.png'
 
 const route = useRoute()
-const auth = useAuthStore()
-const router = useRouter()
 
 const collapsed = ref(false)
 
@@ -82,10 +77,6 @@ const getLinkClass = (to: string, exact?: boolean) => {
   ]
 }
 
-const handleLogout = () => {
-  auth.logout()
-  router.push('/')
-}
 </script>
 
 <template>
@@ -146,18 +137,7 @@ const handleLogout = () => {
       </div>
     </nav>
 
-    <!-- Logout section -->
-    <div class="border-t border-slate-50 p-2">
-      <button
-        @click="handleLogout"
-        class="flex items-center transition-all duration-200 hover:bg-rose-50 hover:text-rose-600 overflow-hidden rounded-[3px]"
-        :class="collapsed ? 'justify-center p-2 mx-auto w-9 h-9' : 'w-full gap-2.5 px-3 py-2 text-xs font-bold text-slate-500'"
-        :title="collapsed ? 'Logout' : ''"
-      >
-        <IconLogout class="h-4 w-4 shrink-0" />
-        <span v-show="!collapsed" class="text-xs">Logout</span>
-      </button>
-    </div>
+
   </aside>
 </template>
 
