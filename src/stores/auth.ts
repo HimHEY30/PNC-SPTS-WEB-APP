@@ -7,11 +7,6 @@ type UserProfile = Record<string, unknown> & {
   last_name?: string
   email?: string
   profile_image?: string | null
-  entity_type?: string
-  phone?: string | null
-  is_active?: boolean
-  status?: string
-  roles?: string[]
   name?: string
 }
 
@@ -21,26 +16,21 @@ function loadCachedUser(): UserProfile | null {
   try {
     const raw = localStorage.getItem(USER_CACHE_KEY)
     if (!raw) return null
-    const parsed = JSON.parse(raw)
-    if (!parsed || typeof parsed !== 'object') return null
-    return parsed as UserProfile
+    return JSON.parse(raw) as UserProfile
   } catch {
     return null
   }
 }
 
 function cacheUser(u: UserProfile | null) {
-  if (u) {
-    localStorage.setItem(USER_CACHE_KEY, JSON.stringify(u))
-  } else {
-    localStorage.removeItem(USER_CACHE_KEY)
-  }
+  if (u) localStorage.setItem(USER_CACHE_KEY, JSON.stringify(u))
+  else localStorage.removeItem(USER_CACHE_KEY)
 }
 
 function buildUser(data: UserProfile): UserProfile {
   return {
     ...data,
-    name: [data.first_name, data.last_name].filter((v): v is string => !!v).join(' ') || data.email || 'User',
+    name: [data.first_name, data.last_name].filter(Boolean).join(' ') || data.email || 'User',
   }
 }
 
@@ -51,8 +41,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function fetchProfile() {
     try {
       if (!isAuthenticated.value) return null
-
-      const response = await api.get('/api/users/profile')
+      const response = await api.get('/users/profile')
       if (response.data?.success) {
         const data = response.data.data as UserProfile
         user.value = buildUser(data)
@@ -60,15 +49,15 @@ export const useAuthStore = defineStore('auth', () => {
         return user.value
       }
     } catch (error) {
-      console.error('Failed to fetch user profile:', error)
+      console.error('Failed to fetch profile:', error)
     }
     return null
   }
 
   async function login(credentials: { email: string; password: string }) {
     try {
-      const response = await api.post('/api/auth/login', credentials)
-
+      localStorage.removeItem('access_token')
+      const response = await api.post('/auth/login', credentials)
       if (response.data?.success && response.data?.data?.access_token) {
         const token = response.data.data.access_token
         localStorage.setItem('access_token', token)
@@ -76,12 +65,11 @@ export const useAuthStore = defineStore('auth', () => {
         isAuthenticated.value = true
 
         await fetchProfile()
-
         return true
       }
       return false
-    } catch (error) {
-      console.error('Login failed:', error)
+    } catch (error: any) {
+      console.error('Login Error:', error)
       throw error
     }
   }
@@ -89,19 +77,14 @@ export const useAuthStore = defineStore('auth', () => {
   function logout() {
     localStorage.removeItem('access_token')
     localStorage.removeItem('user_email')
-    cacheUser(null)
+    localStorage.removeItem(USER_CACHE_KEY)
     isAuthenticated.value = false
     user.value = null
-    token.value = null
-    localStorage.removeItem('auth_token')
   }
 
   function updateUserLocal(data: Partial<UserProfile>) {
     if (user.value) {
-      user.value = buildUser({
-        ...user.value,
-        ...data,
-      })
+      user.value = buildUser({ ...user.value, ...data })
       cacheUser(user.value)
     }
   }
