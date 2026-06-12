@@ -177,7 +177,7 @@ const handleLogout = () => {
 </script>
 
 <template>
-  <div class="h-screen w-screen flex flex-col bg-gradient-to-br from-[#512da8] via-[#8e24aa] to-[#c2185b] text-white font-sans relative no-scrollbar">
+  <div class="h-screen w-screen flex flex-col bg-gradient-to-br from-[#725EC6] via-[#A367C1] to-[#E073BB] text-white font-sans relative no-scrollbar">
     <!-- Top Navbar (Sticky) -->
 
     <nav class="h-12 bg-[#1d2125] flex items-center justify-between px-4 shrink-0 border-b border-white/10 z-50 sticky top-0">
@@ -187,10 +187,10 @@ const handleLogout = () => {
           <span class="text-sm font-medium opacity-80">Student Performance Tracking System</span>
         </div>
         <div class="relative w-[240px] hidden md:block">
-          <input 
+          <input
             v-model="searchQuery"
-            type="text" 
-            placeholder="Search cards..." 
+            type="text"
+            placeholder="Search cards..."
             class="w-full bg-white/10 border border-white/20 rounded-[5px] py-1.5 pl-8 pr-3 text-xs focus:outline-none transition-all"
           >
           <IconSearch class="w-4 h-4 text-white/50 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -210,7 +210,7 @@ const handleLogout = () => {
         </div>
         <button class="opacity-70 hover:opacity-100 transition-opacity p-1.5"><IconBell class="w-5 h-5" /></button>
         <button class="opacity-70 hover:opacity-100 transition-opacity p-1.5"><IconHelpCircle class="w-5 h-5" /></button>
-        <div 
+        <div
           ref="avatarRef"
           @click="isProfileMenuOpen = !isProfileMenuOpen"
           class="w-8 h-8 rounded-full bg-[#ff7452] flex items-center justify-center font-bold text-sm text-white cursor-pointer hover:brightness-110 transition-all border-2 border-[#1d2125]"
@@ -219,13 +219,13 @@ const handleLogout = () => {
         </div>
 
         <Teleport to="body">
-          <div 
-            v-if="isProfileMenuOpen" 
+          <div
+            v-if="isProfileMenuOpen"
             class="fixed inset-0 z-40"
             @click="isProfileMenuOpen = false"
           ></div>
-          <div 
-            v-if="isProfileMenuOpen" 
+          <div
+            v-if="isProfileMenuOpen"
             class="fixed z-50 w-80 bg-[#1e1b4b] border border-white/10 rounded-[5px] shadow-2xl p-2 text-[#b6c2cf]"
             :style="dropdownStyle"
             @click.stop
@@ -298,7 +298,7 @@ const handleLogout = () => {
         >
           <div class="text-center py-2 relative">
             <h3 class="text-sm font-semibold text-white/70">Views</h3>
-            <button 
+            <button
               @click="isBoardTitleMenuOpen = false"
               class="absolute right-2 top-2 text-white/40 hover:text-white transition-colors"
             >
@@ -341,7 +341,7 @@ const handleLogout = () => {
 
       <div class="flex items-center gap-1">
         <div class="flex items-center -space-x-1 mx-1 relative">
-          <div 
+          <div
             @click="isBoardMemberMenuOpen = !isBoardMemberMenuOpen"
             class="w-7 h-7 rounded-full bg-[#ff7452] flex items-center justify-center text-[10px] font-bold border-2 border-[#6e39a0] relative group cursor-pointer"
           >
@@ -351,8 +351,8 @@ const handleLogout = () => {
             </div>
 
             <!-- Board Member Profile Dropdown -->
-            <div 
-              v-if="isBoardMemberMenuOpen" 
+            <div
+              v-if="isBoardMemberMenuOpen"
               class="absolute top-full right-0 mt-1 w-80 bg-[#1e1b4b] border border-white/10 rounded-[5px] shadow-2xl z-[100] p-2 text-[#b6c2cf] text-left"
               @click.stop
             >
@@ -421,9 +421,9 @@ const handleLogout = () => {
 
     <!-- Board Content (Vertical Page Scroll) -->
     <main class="flex-1 p-3 flex items-start gap-3 pb-32 overflow-auto no-scrollbar">
-      <div 
-        v-for="list in filteredLists" 
-        :key="list.id" 
+      <div
+        v-for="list in filteredLists"
+        :key="list.id"
         class="w-72 shrink-0 rounded-[5px] flex flex-col transition-all shadow-lg h-fit"
         :class="list.color"
         @dragover.prevent
@@ -440,9 +440,9 @@ const handleLogout = () => {
         </div>
 
         <div class="px-2 pb-2 space-y-2">
-          <div 
-            v-for="card in list.cards" 
-            :key="card.id" 
+          <div
+            v-for="card in list.cards"
+            :key="card.id"
             class="bg-[#1d2125] rounded-[5px] shadow-sm hover:ring-2 hover:ring-blue-500 cursor-pointer transition-all relative group w-full"
             draggable="true"
             @dragstart="onDragStart($event, card, list.id)"
@@ -464,10 +464,10 @@ const handleLogout = () => {
                   <IconCheck class="w-3 h-3 text-[#1d2125]" />
                 </div>
                 <p class="text-[13px] font-medium leading-relaxed text-white/90 pr-6">{{ card.title }}</p>
-                
+
                 <!-- Card Menu Trigger -->
                 <div class="absolute right-2 top-2.5">
-                  <button 
+                  <button
                     @click.stop="openCardMenuId = openCardMenuId === card.id ? null : card.id"
                     class="p-1 rounded-[5px] hover:bg-white/10 text-white/50 hover:text-white transition-all opacity-0 group-hover:opacity-100"
                     :class="{ 'opacity-100 bg-white/10': openCardMenuId === card.id }"
@@ -492,7 +492,7 @@ const handleLogout = () => {
                   </div>
                 </div>
               </div>
-              
+
               <div v-if="card.icons" class="flex items-center justify-between mt-1 pt-2 border-t border-white/5 opacity-60">
                 <div class="flex items-center gap-3">
                   <div v-if="card.icons.includes('loom')" class="flex items-center gap-1">
@@ -523,7 +523,7 @@ const handleLogout = () => {
               </div>
             </div>
             <div class="flex items-center gap-2">
-              <button 
+              <button
                 @click="addCard(list.id)"
                 class="bg-[#579dff] text-[#1d2125] font-semibold px-3 py-1.5 rounded-[5px] text-sm"
               >
@@ -533,7 +533,7 @@ const handleLogout = () => {
                 <IconBulb class="w-4 h-4" />
                 Tip
               </button>
-              <button 
+              <button
                 @click="toggleAddCard(null)"
                 class="p-1.5 rounded-[5px] text-[#9fadbc] hover:text-white cursor-pointer transition-colors"
               >
@@ -543,7 +543,7 @@ const handleLogout = () => {
           </div>
 
           <!-- Add Card Button (Trigger) -->
-          <button 
+          <button
             v-else
             @click="toggleAddCard(list.id)"
             class="w-full flex items-center justify-between px-2 py-1.5 rounded-[5px] text-sm font-medium"
