@@ -15,4 +15,13 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
   },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://pnc-spts-stg-api.me',
+        changeOrigin: true,
+        secure: true,
+      }
+    }
+  }
 })

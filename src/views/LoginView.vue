@@ -17,18 +17,29 @@ const error = ref('')
 const loading = ref(false)
 
 // Runs when user clicks the Sign In button
-// Shows a loading state for half a second, then logs in and redirects to the board
-const submit = (e: Event) => {
+// Now connects to the API via the auth store
+const submit = async (e: Event) => {
   e.preventDefault()
   error.value = ''
   loading.value = true
 
-  // Simulate a short network delay so the loading animation is visible
-  setTimeout(() => {
-    auth.login()
+  try {
+    // Call the API with the email and password
+    await auth.login({
+      email: email.value,
+      password: password.value,
+    })
+
+    // If successful, go to the board
     router.push('/board')
+  } catch (err: any) {
+    // If the API returns an error, display it in the 'error' div
+    // We check auth.error first (in case the store set it), otherwise use a generic message
+    error.value = auth.error || 'Login failed. Please check your credentials.'
+  } finally {
+    // Always stop the loading animation
     loading.value = false
-  }, 500)
+  }
 }
 </script>
 
@@ -93,4 +104,3 @@ const submit = (e: Event) => {
     </div>
   </div>
 </template>
-
