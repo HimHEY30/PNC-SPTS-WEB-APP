@@ -21,11 +21,17 @@ const router = createRouter({
     {
       path: '/admin',
       component: AdminLayout,
+      meta: { requiresAuth: true },
       children: [
         {
           path: '',
           name: 'admin-dashboard',
           component: () => import('@/views/admin/DashboardView.vue'),
+        },
+        {
+          path: 'users',
+          name: 'admin-users',
+          component: () => import('@/views/admin/UserManagementView.vue'),
         },
         {
           path: 'teachers',
@@ -60,7 +66,7 @@ const router = createRouter({
         {
           path: 'reports',
           name: 'admin-reports',
-          component: () => import('@/views/admin/PlaceholderView.vue'),
+          component: () => import('@/views/admin/ReportsView.vue'),
         },
         {
           path: 'settings',
@@ -70,17 +76,22 @@ const router = createRouter({
         {
           path: 'goals',
           name: 'admin-goals',
-          component: () => import('@/views/admin/PlaceholderView.vue'),
+          component: () => import('@/views/admin/GoalSettingView.vue'),
         },
         {
           path: 'active',
           name: 'admin-active',
-          component: () => import('@/views/admin/PlaceholderView.vue'),
+          component: () => import('@/views/admin/ActiveFollowUpsView.vue'),
         },
         {
           path: 'website',
           name: 'admin-website',
-          component: () => import('@/views/admin/PlaceholderView.vue'),
+          component: () => import('@/views/admin/PncPortalView.vue'),
+        },
+        {
+          path: 'profile',
+          name: 'admin-profile',
+          component: () => import('@/views/admin/ProfileView.vue'),
         },
       ],
     },
@@ -89,7 +100,8 @@ const router = createRouter({
 
 router.beforeEach((to, _from, next) => {
   const auth = useAuthStore()
-  if (to.meta.requiresAuth && !auth.isAuthenticated) {
+  const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
+  if (requiresAuth && !auth.isAuthenticated) {
     next('/')
   } else {
     next()

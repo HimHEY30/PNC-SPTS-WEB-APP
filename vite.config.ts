@@ -18,10 +18,18 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://pnc-spts-stg-api.me',
+        target: 'http://localhost:3000',
         changeOrigin: true,
-        secure: true,
-      }
+        configure: (proxy) => {
+          proxy.on('error', (err) => {
+            console.error('[Vite Proxy] Backend unavailable:', err.message)
+          })
+        },
+      },
+      '/uploads': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
     }
   }
 })

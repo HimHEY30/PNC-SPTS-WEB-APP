@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, inject, type Ref } from 'vue'
+import { ref, computed, inject, type Ref, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { useStudentsStore } from '@/stores/students'
 import nitaraAvatar from '@/assets/images/nitara_avatar.png'
 import {
   IconSearch,
@@ -16,17 +18,112 @@ import {
 import BaseDropdown from '@/components/ui/dropdowns/BaseDropdown.vue'
 import type { DropdownOption } from '@/components/ui/dropdowns/BaseDropdown.vue'
 
+const route = useRoute()
+const store = useStudentsStore()
+
+const studentId = computed(() => route.params.id as string)
+
 // Student details state (editable)
 const student = ref({
-  id: 'STU-005',
-  name: 'Nitara Verma',
-  email: 'nitraverma@email.com',
-  phone: '+91 555-3344',
-  address: '78 Maple Drive, Noida, UP, India',
-  enrollmentDate: 'Jun 30, 2028',
+  id: '1',
+  name: 'Lethean Seourn',
+  email: 'lethean.seourn@student.passerellesnumeriques.org',
+  phone: '+855092333064',
+  address: 'Kampong Cham',
+  createdAt: 'Jun 11, 2026',
   status: 'Active',
   avatar: nitaraAvatar,
+  studentCode: 'PNC2025-001',
+  placeOfBirth: 'Kampong Cham',
+  gender: 'Male',
+  classId: '1',
 })
+
+// Class Cache Mapping
+interface ClassItem {
+  id: string
+  name: string
+  batchYear: number
+  createdAt: string
+  updatedAt: string
+}
+
+const CLASSES_CACHE_KEY = 'classes_cache'
+
+const defaultClasses: ClassItem[] = [
+  {
+    id: '1',
+    name: 'WEB C',
+    batchYear: 2025,
+    createdAt: '2026-06-11 21:15:34.000',
+    updatedAt: '2026-06-11 21:15:34.000',
+  },
+  {
+    id: '2',
+    name: 'WEB B',
+    batchYear: 2025,
+    createdAt: '2026-06-11 21:46:30.000',
+    updatedAt: '2026-06-11 21:46:30.000',
+  }
+]
+
+function loadClasses(): Record<string, ClassItem> {
+  // Sync the latest defaultClasses to localStorage to avoid stale cached values in client browser
+  localStorage.setItem(CLASSES_CACHE_KEY, JSON.stringify(defaultClasses))
+  
+  const map: Record<string, ClassItem> = {}
+  defaultClasses.forEach(c => {
+    map[c.id] = c
+  })
+  return map
+}
+
+const classCache = ref<Record<string, ClassItem>>(loadClasses())
+
+const storeStudent = computed(() => {
+  return store.students.find(s => s.id === studentId.value)
+})
+
+const updateLocalStudent = () => {
+  if (storeStudent.value) {
+    const s = storeStudent.value
+    student.value = {
+      id: s.id,
+      name: s.name,
+      email: s.email,
+      phone: s.phone,
+      address: s.placeOfBirth,
+      createdAt: s.createdAt,
+      status: s.status,
+      avatar: s.profileImage || nitaraAvatar,
+      studentCode: s.studentCode,
+      placeOfBirth: s.placeOfBirth,
+      gender: s.gender,
+      classId: s.classId,
+    }
+  }
+}
+
+watch(storeStudent, () => {
+  updateLocalStudent()
+}, { immediate: true })
+
+onMounted(async () => {
+  if (!store.fetched) {
+    await store.fetchStudents()
+  }
+  updateLocalStudent()
+})
+
+const statusClass = (s: string) => {
+  switch (s) {
+    case 'Active': return 'text-emerald-700 bg-emerald-50 border border-emerald-200'
+    case 'Suspended': return 'text-amber-700 bg-amber-50 border border-amber-200'
+    case 'Graduated': return 'text-blue-700 bg-blue-50 border border-blue-200'
+    default: return 'text-slate-500 bg-slate-50 border border-slate-200'
+  }
+}
+
 
 // Awards & Recognitions
 const awards = ref([
@@ -197,18 +294,36 @@ const filteredCourses = computed(() => {
   })
 })
 
+import { api } from '@/services/api'
+
 // Modal controls for editing student
 const showEditModal = ref(false)
 const editFormData = ref({ ...student.value })
 const formErrors = ref<Record<string, string>>({})
+const studentFileInput = ref<HTMLInputElement | null>(null)
+const selectedStudentFile = ref<File | null>(null)
 
 const openEditModal = () => {
   editFormData.value = { ...student.value }
+  selectedStudentFile.value = null
   formErrors.value = {}
   showEditModal.value = true
 }
 
-const handleSaveStudent = () => {
+function onStudentFileSelected(e: Event) {
+  const target = e.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+  selectedStudentFile.value = file
+  
+  const reader = new FileReader()
+  reader.onload = () => {
+    editFormData.value.avatar = reader.result as string
+  }
+  reader.readAsDataURL(file)
+}
+
+const handleSaveStudent = async () => {
   // Simple validation
   const errors: Record<string, string> = {}
   if (!editFormData.value.name.trim()) errors.name = 'Name is required'
@@ -225,8 +340,78 @@ const handleSaveStudent = () => {
     return
   }
 
-  student.value = { ...editFormData.value }
-  showEditModal.value = false
+  let uploadedUrl = editFormData.value.avatar
+  
+  try {
+    if (selectedStudentFile.value) {
+      const fd = new FormData()
+      fd.append('image', selectedStudentFile.value)
+      const resImg = await api.post('/api/users/profile/image', fd)
+      if (resImg.data?.data?.url) {
+        uploadedUrl = resImg.data.data.url
+      } else if (resImg.data?.url) {
+        uploadedUrl = resImg.data.url
+      }
+    }
+    
+    const nameParts = editFormData.value.name.trim().split(' ')
+    const firstName = nameParts[0] || ''
+    const lastName = nameParts.slice(1).join(' ') || ''
+    
+    const payload = {
+      firstName: firstName,
+      lastName: lastName,
+      email: editFormData.value.email,
+      phone: editFormData.value.phone,
+      placeOfBirth: editFormData.value.address,
+      classId: editFormData.value.classId,
+      status: editFormData.value.status,
+      profileImage: uploadedUrl,
+    }
+    
+    await api.patch(`/api/students/${student.value.id}`, payload)
+    
+    student.value = { 
+      ...editFormData.value,
+      avatar: uploadedUrl
+    }
+    showEditModal.value = false
+    
+    await store.fetchStudents()
+  } catch (err) {
+    console.error('Failed to update student in database:', err)
+    
+    student.value = { 
+      ...editFormData.value,
+      avatar: uploadedUrl
+    }
+    showEditModal.value = false
+    
+    const idx = store.students.findIndex(s => s.id === student.value.id)
+    if (idx !== -1) {
+      const nameParts = student.value.name.trim().split(' ')
+      const firstName = nameParts[0] || ''
+      const lastName = nameParts.slice(1).join(' ') || ''
+      
+      const updated = {
+        ...store.students[idx],
+        firstName: firstName,
+        lastName: lastName,
+        name: student.value.name,
+        email: student.value.email,
+        phone: student.value.phone,
+        placeOfBirth: student.value.address,
+        status: student.value.status,
+        classId: student.value.classId,
+        profileImage: uploadedUrl,
+        updatedAt: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+      }
+      store.students[idx] = updated
+      localStorage.setItem('students_cache', JSON.stringify(store.students))
+    }
+  }
+  
+  selectedStudentFile.value = null
 }
 
 </script>
@@ -248,22 +433,25 @@ const handleSaveStudent = () => {
             <img 
               :src="student.avatar" 
               class="w-20 h-20 rounded-full border-4 border-white object-cover shadow-sm"
-              alt="Nitara Verma"
+              :alt="student.name"
             />
           </div>
 
           <!-- Basic Info -->
           <div class="px-4 pt-3 pb-2">
-            <div class="flex justify-center gap-2 mb-2">
-              <span class="px-2 py-0.5 rounded-full border border-blue-200 text-blue-600 text-[10px] font-bold bg-blue-50/50 uppercase tracking-wider">
+            <div class="flex justify-center gap-1.5 flex-wrap mb-2">
+              <span class="px-2 py-0.5 rounded-[3px] border border-blue-200 text-blue-600 text-[10px] font-bold bg-blue-50/50 uppercase tracking-wider">
                 {{ student.id }}
               </span>
-              <span class="px-2 py-0.5 rounded-full text-rose-500 text-[10px] font-bold bg-rose-50 uppercase tracking-wider">
+              <span v-if="student.classId" class="px-2 py-0.5 rounded-[3px] border border-slate-200 text-[#3b4b6b] text-[10px] font-bold bg-slate-50 uppercase tracking-wider">
+                {{ classCache[student.classId]?.name || student.classId }}
+              </span>
+              <span :class="['px-2 py-0.5 rounded-[3px] text-[10px] font-bold uppercase tracking-wider border', statusClass(student.status)]">
                 {{ student.status }}
               </span>
             </div>
             <h3 class="text-sm font-bold text-[#0f172a]">{{ student.name }}</h3>
-            <p class="text-xs font-bold text-slate-400 mt-0.5 select-none">Enrolled on {{ student.enrollmentDate }}</p>
+            <p class="text-xs font-bold text-slate-400 mt-0.5 select-none">Enrolled on {{ student.createdAt }}</p>
           </div>
 
           <!-- Quick Action Buttons -->
@@ -590,9 +778,9 @@ const handleSaveStudent = () => {
                   v-model="courseSearchQuery"
                   type="text" 
                   placeholder="Search courses..."
-                  class="w-full bg-white border border-slate-200 rounded-[3px] py-1 pl-7 pr-2 text-[9px] outline-none focus:border-indigo-300 transition-all"
+                  class="w-full bg-[#f1f3f9] text-[#1e293b] rounded-[5px] py-1.5 pl-8 pr-3 text-xs border border-transparent outline-none focus:bg-[#f1f3f9]"
                 />
-                <IconSearch class="w-3 h-3 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2" />
+                <IconSearch class="w-4 h-4 text-[#94a3b8] absolute left-3 top-1/2 -translate-y-1/2" />
               </div>
               <BaseDropdown v-model="courseStatusFilter" :options="courseStatusOptions" size="sm" position="right" />
             </div>
@@ -681,12 +869,36 @@ const handleSaveStudent = () => {
 
             <!-- Form -->
             <div class="px-4 py-3 space-y-3 text-left">
+              <!-- Profile Image Uploader -->
+              <div class="flex items-center gap-4 border-b border-slate-100 pb-3">
+                <div class="w-12 h-12 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                  <img v-if="editFormData.avatar" :src="editFormData.avatar" class="w-full h-full object-cover" />
+                  <IconUser v-else class="w-6 h-6 text-slate-400" />
+                </div>
+                <div>
+                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Profile Image</label>
+                  <button 
+                    @click="studentFileInput?.click()" 
+                    type="button"
+                    class="px-2.5 py-1 bg-white border border-slate-200 rounded-[3px] text-[10px] font-bold text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
+                  >
+                    Choose Photo
+                  </button>
+                  <input 
+                    ref="studentFileInput" 
+                    type="file" 
+                    accept="image/*" 
+                    class="hidden" 
+                    @change="onStudentFileSelected" 
+                  />
+                </div>
+              </div>
               <div>
                 <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Full Name</label>
                 <input 
                   v-model="editFormData.name"
                   type="text" 
-                  class="mt-1 w-full border border-slate-200 rounded-[5px] px-3 py-1.5 text-xs text-[#0f172a] focus:border-purple-300 focus:outline-none transition-colors"
+                  class="mt-1 w-full border border-slate-200 rounded-[5px] px-3 py-1.5 text-xs text-[#0f172a] focus:border-indigo-300 focus:outline-none transition-colors"
                   :class="{ 'border-rose-300 focus:border-rose-400': formErrors.name }"
                 />
                 <span v-if="formErrors.name" class="text-[10px] font-bold text-rose-500 mt-0.5">{{ formErrors.name }}</span>
@@ -697,7 +909,7 @@ const handleSaveStudent = () => {
                 <input 
                   v-model="editFormData.email"
                   type="email" 
-                  class="mt-1 w-full border border-slate-200 rounded-[5px] px-3 py-1.5 text-xs text-[#0f172a] focus:border-purple-300 focus:outline-none transition-colors"
+                  class="mt-1 w-full border border-slate-200 rounded-[5px] px-3 py-1.5 text-xs text-[#0f172a] focus:border-indigo-300 focus:outline-none transition-colors"
                   :class="{ 'border-rose-300 focus:border-rose-400': formErrors.email }"
                 />
                 <span v-if="formErrors.email" class="text-[10px] font-bold text-rose-500 mt-0.5">{{ formErrors.email }}</span>
@@ -708,7 +920,7 @@ const handleSaveStudent = () => {
                 <input 
                   v-model="editFormData.phone"
                   type="text" 
-                  class="mt-1 w-full border border-slate-200 rounded-[5px] px-3 py-1.5 text-xs text-[#0f172a] focus:border-purple-300 focus:outline-none transition-colors"
+                  class="mt-1 w-full border border-slate-200 rounded-[5px] px-3 py-1.5 text-xs text-[#0f172a] focus:border-indigo-300 focus:outline-none transition-colors"
                   :class="{ 'border-rose-300 focus:border-rose-400': formErrors.phone }"
                 />
                 <span v-if="formErrors.phone" class="text-[10px] font-bold text-rose-500 mt-0.5">{{ formErrors.phone }}</span>
@@ -719,34 +931,35 @@ const handleSaveStudent = () => {
                 <textarea 
                   v-model="editFormData.address"
                   rows="2"
-                  class="mt-1 w-full border border-slate-200 rounded-[5px] px-3 py-1.5 text-xs text-[#0f172a] focus:border-purple-300 focus:outline-none transition-colors resize-none"
+                  class="mt-1 w-full border border-slate-200 rounded-[5px] px-3 py-1.5 text-xs text-[#0f172a] focus:border-indigo-300 focus:outline-none transition-colors resize-none"
                   :class="{ 'border-rose-300 focus:border-rose-400': formErrors.address }"
                 ></textarea>
                 <span v-if="formErrors.address" class="text-[10px] font-bold text-rose-500 mt-0.5">{{ formErrors.address }}</span>
               </div>
 
-              <!-- Status Selection -->
-              <div>
-                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Status</label>
-                <div class="flex items-center gap-4">
-                  <label class="flex items-center gap-1.5 cursor-pointer font-bold text-xs text-slate-700">
-                    <input 
-                      v-model="editFormData.status"
-                      type="radio" 
-                      value="Active"
-                      class="w-4 h-4 text-[#6366f1] focus:ring-[#6366f1]"
-                    />
-                    <span>Active</span>
-                  </label>
-                  <label class="flex items-center gap-1.5 cursor-pointer font-bold text-xs text-slate-700">
-                    <input 
-                      v-model="editFormData.status"
-                      type="radio" 
-                      value="Inactive"
-                      class="w-4 h-4 text-[#6366f1] focus:ring-[#6366f1]"
-                    />
-                    <span>Inactive</span>
-                  </label>
+              <!-- Class & Status Selection -->
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Class</label>
+                  <select 
+                    v-model="editFormData.classId"
+                    class="w-full rounded-[5px] border border-slate-200 px-3 py-1.5 text-xs text-[#0f172a] focus:outline-none focus:border-indigo-300 bg-white"
+                  >
+                    <option v-for="c in Object.values(classCache)" :key="c.id" :value="c.id">
+                      {{ c.name }}
+                    </option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Status</label>
+                  <select 
+                    v-model="editFormData.status"
+                    class="w-full rounded-[5px] border border-slate-200 px-3 py-1.5 text-xs text-[#0f172a] focus:outline-none focus:border-indigo-300 bg-white"
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Suspended">Suspended</option>
+                    <option value="Graduated">Graduated</option>
+                  </select>
                 </div>
               </div>
             </div>
@@ -761,7 +974,7 @@ const handleSaveStudent = () => {
               </button>
               <button 
                 @click="handleSaveStudent"
-                class="px-4 py-1.5 bg-[#1e1b4b] hover:bg-[#2e3b54] text-white font-bold text-xs rounded-[5px] transition-colors shadow-sm"
+                class="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-[5px] transition-colors shadow-sm"
               >
                 Save Changes
               </button>

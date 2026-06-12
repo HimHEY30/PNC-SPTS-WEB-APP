@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import {
   IconUsers,
   IconBriefcase,
@@ -9,6 +9,9 @@ import {
   IconArrowRight,
   IconMessage,
   IconFileText,
+  IconChevronLeft,
+  IconChevronRight,
+  IconCalendarEvent,
 } from '@tabler/icons-vue'
 
 // Stat Cards data matching SRS Page 2
@@ -35,12 +38,49 @@ const recentActivity = ref([
 
 const getPriorityClass = (priority: string) => {
   switch (priority) {
-    case 'Critical': return 'bg-rose-100 text-rose-700'
-    case 'High': return 'bg-orange-100 text-orange-700'
-    case 'Medium': return 'bg-amber-100 text-amber-700'
-    case 'Low': return 'bg-emerald-100 text-emerald-700'
+    case 'Critical': return 'bg-rose-100 text-rose-700 border-rose-200'
+    case 'High': return 'bg-orange-100 text-orange-700 border-orange-200'
+    case 'Medium': return 'bg-amber-100 text-amber-700 border-amber-200'
+    case 'Low': return 'bg-emerald-100 text-emerald-700 border-emerald-200'
     default: return 'bg-slate-100 text-slate-700'
   }
+}
+
+// Compact Card Calendar
+const cardCalDate = ref(new Date())
+
+const cardCalYear = computed(() => cardCalDate.value.getFullYear())
+const cardCalMonth = computed(() => cardCalDate.value.getMonth())
+const cardCalMonthName = computed(() =>
+  cardCalDate.value.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+)
+
+const cardCalDays = computed(() => {
+  const year = cardCalYear.value
+  const month = cardCalMonth.value
+  const firstDay = new Date(year, month, 1).getDay()
+  const totalDays = new Date(year, month + 1, 0).getDate()
+  const today = new Date()
+
+  const cells: { num: number; isCurrent: boolean; isToday: boolean }[] = []
+
+  for (let i = 0; i < firstDay; i++) {
+    cells.push({ num: 0, isCurrent: false, isToday: false })
+  }
+  for (let d = 1; d <= totalDays; d++) {
+    const isToday =
+      d === today.getDate() && month === today.getMonth() && year === today.getFullYear()
+    cells.push({ num: d, isCurrent: true, isToday })
+  }
+  return cells
+})
+
+function cardCalPrev() {
+  cardCalDate.value = new Date(cardCalYear.value, cardCalMonth.value - 1, 1)
+}
+
+function cardCalNext() {
+  cardCalDate.value = new Date(cardCalYear.value, cardCalMonth.value + 1, 1)
 }
 </script>
 
@@ -120,7 +160,7 @@ const getPriorityClass = (priority: string) => {
                   <p class="text-[10px] font-bold text-slate-400 mt-px">{{ activity.type }}</p>
                 </td>
                 <td class="px-3 py-2">
-                  <span :class="['px-1.5 py-0.5 rounded-[3px] text-[9px] font-bold', getPriorityClass(activity.priority)]">
+                  <span :class="['inline-flex items-center rounded-[3px] px-2 py-0.5 text-[10px] font-bold border', getPriorityClass(activity.priority)]">
                     {{ activity.priority }}
                   </span>
                 </td>
@@ -135,17 +175,38 @@ const getPriorityClass = (priority: string) => {
 
       <!-- Right Column -->
       <div class="space-y-3">
-        <!-- Case Categories -->
-        <div class="bg-white rounded-[5px] border border-slate-100 shadow-sm p-3 space-y-3">
-          <h3 class="text-xs font-bold text-[#0f172a]">Case Categories</h3>
-          <div class="space-y-2">
-            <div v-for="(count, type) in { Academic: 42, Behaviour: 18, Achievement: 12, 'Pastoral Care': 14 }" :key="type" class="space-y-1">
-              <div class="flex justify-between">
-                <span class="text-xs font-bold text-[#475569]">{{ type }}</span>
-                <span class="text-xs font-bold text-[#475569]">{{ count }}</span>
-              </div>
-              <div class="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                <div class="h-full bg-[#3b4b6b] rounded-full" :style="`width: ${ (count / 86) * 100 }%`"></div>
+        <!-- Compact Card Calendar -->
+        <div class="bg-white rounded-[5px] border border-slate-100 shadow-sm select-none">
+          <div class="flex items-center justify-between px-3 py-2 bg-[#1e1b4b] rounded-t-[5px]">
+            <div class="flex items-center gap-1.5">
+              <IconCalendarEvent class="w-3.5 h-3.5 text-white/70" />
+              <span class="text-xs font-bold text-white">{{ cardCalMonthName }}</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button @click="cardCalPrev" class="p-1 rounded-[3px] text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer">
+                <IconChevronLeft class="w-3.5 h-3.5" />
+              </button>
+              <button @click="cardCalNext" class="p-1 rounded-[3px] text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer">
+                <IconChevronRight class="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+          <div class="p-2">
+            <div class="grid grid-cols-7 text-center text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              <span v-for="d in ['S', 'M', 'T', 'W', 'T', 'F', 'S']" :key="d" class="py-1">{{ d }}</span>
+            </div>
+            <div class="grid grid-cols-7 text-center">
+              <div
+                v-for="(cell, ci) in cardCalDays"
+                :key="ci"
+                class="py-1 text-[10px] font-bold"
+                :class="cell.isCurrent
+                  ? cell.isToday
+                    ? 'bg-slate-900 text-white rounded-[3px]'
+                    : 'text-slate-700'
+                  : 'text-slate-200'"
+              >
+                {{ cell.num || '' }}
               </div>
             </div>
           </div>

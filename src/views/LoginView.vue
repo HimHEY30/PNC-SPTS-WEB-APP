@@ -17,27 +17,32 @@ const error = ref('')
 const loading = ref(false)
 
 // Runs when user clicks the Sign In button
-// Now connects to the API via the auth store
+// Shows a loading state for half a second, then logs in and redirects to the board
 const submit = async (e: Event) => {
   e.preventDefault()
   error.value = ''
+
+  if (!email.value || !password.value) {
+    error.value = 'Please enter both email and password'
+    return
+  }
+
   loading.value = true
 
   try {
-    // Call the API with the email and password
-    await auth.login({
+    const success = await auth.login({
       email: email.value,
-      password: password.value,
+      password: password.value
     })
 
-    // If successful, go to the board
-    router.push('/board')
+    if (success) {
+      router.push('/board')
+    } else {
+      error.value = 'Invalid credentials'
+    }
   } catch (err: any) {
-    // If the API returns an error, display it in the 'error' div
-    // We check auth.error first (in case the store set it), otherwise use a generic message
-    error.value = auth.error || 'Login failed. Please check your credentials.'
+    error.value = err.response?.data?.message || 'Failed to login. Please check your credentials.'
   } finally {
-    // Always stop the loading animation
     loading.value = false
   }
 }
@@ -98,8 +103,8 @@ const submit = async (e: Event) => {
       </form>
 
       <div class="demo-info">
-        <p class="demo-label">Demo Account</p>
-        <p class="demo-creds">admin@admin.com / admin</p>
+        <p class="demo-label">Staging Account</p>
+        <p class="demo-creds">superadmin@example.com / Password123!</p>
       </div>
     </div>
   </div>
