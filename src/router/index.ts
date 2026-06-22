@@ -16,7 +16,7 @@ const router = createRouter({
       path: '/board',
       name: 'board',
       component: StudentBoard,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, roles: ['SUPER_ADMIN', 'ADMIN', 'TUTOR', 'TEACHER'] },
     },
     {
       path: '/admin',
@@ -32,16 +32,19 @@ const router = createRouter({
           path: 'users',
           name: 'admin-users',
           component: () => import('@/views/admin/UserManagementView.vue'),
+          meta: { roles: ['SUPER_ADMIN', 'ADMIN'] },
         },
         {
           path: 'teachers',
           name: 'admin-teachers',
           component: () => import('@/views/admin/TeacherManagementView.vue'),
+          meta: { roles: ['SUPER_ADMIN', 'ADMIN'] },
         },
         {
           path: 'tasks',
           name: 'admin-tasks',
           component: () => import('@/views/admin/FollowUpTimelineView.vue'),
+          meta: { roles: ['SUPER_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER', 'FOLLOWUP_OFFICER'] },
         },
         {
           path: 'students',
@@ -54,39 +57,16 @@ const router = createRouter({
           component: () => import('@/views/admin/StudentDetailsView.vue'),
         },
         {
-          path: 'calendar',
-          name: 'admin-calendar',
-          component: () => import('@/views/admin/CalendarView.vue'),
-        },
-        {
-          path: 'courses',
-          name: 'admin-courses',
-          component: () => import('@/views/admin/CourseManagementView.vue'),
-        },
-        {
-          path: 'reports',
-          name: 'admin-reports',
-          component: () => import('@/views/admin/ReportsView.vue'),
-        },
-        {
           path: 'settings',
           name: 'admin-settings',
           component: () => import('@/views/admin/FollowUpTypesView.vue'),
-        },
-        {
-          path: 'goals',
-          name: 'admin-goals',
-          component: () => import('@/views/admin/GoalSettingView.vue'),
+          meta: { roles: ['SUPER_ADMIN', 'ADMIN'] },
         },
         {
           path: 'active',
           name: 'admin-active',
           component: () => import('@/views/admin/ActiveFollowUpsView.vue'),
-        },
-        {
-          path: 'website',
-          name: 'admin-website',
-          component: () => import('@/views/admin/PncPortalView.vue'),
+          meta: { roles: ['SUPER_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER', 'FOLLOWUP_OFFICER'] },
         },
         {
           path: 'profile',
@@ -100,12 +80,35 @@ const router = createRouter({
 
 router.beforeEach((to, _from, next) => {
   const auth = useAuthStore()
-  const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
+  const requiresAuth = to.matched.some((record) => record.meta.requiresAuth)
   if (requiresAuth && !auth.isAuthenticated) {
     next('/')
-  } else {
-    next()
+    return
   }
+
+  // Check role-based access if authenticated
+  if (auth.isAuthenticated) {
+    const userRoles = auth.user?.roles || []
+
+    // Find if any matched route requires specific roles
+    const requiredRoles = to.matched.reduce<string[]>((acc, record) => {
+      if (record.meta && Array.isArray(record.meta.roles)) {
+        return record.meta.roles
+      }
+      return acc
+    }, [])
+
+    if (requiredRoles.length > 0) {
+      const hasAllowedRole = requiredRoles.some((role) => userRoles.includes(role))
+      if (!hasAllowedRole) {
+        // User not authorized for this page, redirect to admin dashboard
+        next('/admin')
+        return
+      }
+    }
+  }
+
+  next()
 })
 
 export default router

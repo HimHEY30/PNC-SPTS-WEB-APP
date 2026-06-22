@@ -1,6 +1,6 @@
 # 🎨 Admin Visual Style Guide & Cleanup Checklist
 
-This style guide defines the design tokens, components, page layouts, and the quality assurance checklist for the admin view namespace in the Student Performance Tracking System.
+This style guide defines the design tokens, components, page layouts, and the quality assurance checklist for the admin view namespace in the Student Follow-Up System.
 
 ---
 

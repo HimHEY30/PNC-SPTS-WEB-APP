@@ -1,41 +1,43 @@
 <script setup lang="ts">
-// The login page - just a simple form with email/password fields
-// Clicking Sign In logs you in with a demo account
+// Redesigned login page matching the "Testdino" style
+// Clean, white card on light gray background with blurred mesh circles
 
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { IconEye, IconEyeOff, IconMail, IconLock } from '@tabler/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { getErrorMessage } from '@/services/api'
+import logoSrc from '@/assets/images/logo1.png'
 
 const auth = useAuthStore()
 const router = useRouter()
 
-// Form state - these are bound to the inputs below with v-model
+// Form state
 const email = ref('')
 const password = ref('')
 const showPassword = ref(false)
+const rememberMe = ref(false)
 const error = ref('')
 const loading = ref(false)
 
-// Runs when user clicks the Sign In button
-// Shows a loading state for half a second, then logs in and redirects to the board
+// Submission handler
 const submit = async (e: Event) => {
   e.preventDefault()
   error.value = ''
-  
+
   if (!email.value || !password.value) {
     error.value = 'Please fill in all fields'
     return
   }
-  
+
   loading.value = true
 
   try {
-    const success = await auth.login({ 
-      email: email.value, 
-      password: password.value 
+    const success = await auth.login({
+      email: email.value,
+      password: password.value,
     })
-    
+
     if (success) {
       router.push('/board')
     } else {
@@ -50,64 +52,122 @@ const submit = async (e: Event) => {
 </script>
 
 <template>
-  <div class="login-page">
-    <div class="login-card">
-      <h1>Sign In</h1>
-      <p class="subtitle">Welcome back! Please enter your details</p>
+  <div
+    class="relative min-h-screen w-full bg-[#f8fafc] flex flex-col items-center justify-center p-4 overflow-hidden text-slate-800"
+  >
+    <!-- Background blurred accent blobs for premium depth (glassmorphism/mesh effect) -->
+    <div
+      class="absolute top-1/4 left-1/4 w-[350px] h-[350px] bg-indigo-200/40 rounded-full blur-3xl -z-10 animate-pulse duration-[8000ms]"
+    ></div>
+    <div
+      class="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-sky-200/40 rounded-full blur-3xl -z-10 animate-pulse duration-[10000ms]"
+    ></div>
+    <div
+      class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-violet-200/30 rounded-full blur-3xl -z-10"
+    ></div>
 
-      <div v-if="error" class="error-msg">{{ error }}</div>
+    <!-- Login Card Container -->
+    <div
+      class="w-full max-w-[420px] bg-white rounded-[24px] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 sm:p-10 z-10"
+    >
+      <!-- Logo Header -->
+      <div class="flex flex-col items-center mb-8">
+        <div class="flex items-center gap-2 mb-6">
+          <img :src="logoSrc" class="h-8 w-auto object-contain" alt="Logo" />
+          <span class="text-[22px] font-bold text-slate-900 tracking-tight">PNC SPTS</span>
+        </div>
+        <h1 class="text-[24px] font-bold text-slate-900 tracking-tight text-center">
+          Sign into your account
+        </h1>
+      </div>
 
-      <form @submit="submit">
-        <div class="field">
-          <label>Email</label>
-          <input
-            type="email"
-            placeholder="Enter your email"
-            v-model="email"
-            autocomplete="email"
-          />
+      <!-- Error Alert -->
+      <div
+        v-if="error"
+        class="bg-red-50 border border-red-100 text-red-600 px-4 py-2.5 rounded-lg text-xs mb-6 text-center font-medium"
+      >
+        {{ error }}
+      </div>
+
+      <!-- Form -->
+      <form @submit="submit" class="flex flex-col gap-5">
+        <!-- Email Field -->
+        <div class="space-y-1.5 text-left">
+          <label class="block text-sm font-semibold text-slate-700">Email</label>
+          <div class="relative">
+            <IconMail
+              class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
+            />
+            <input
+              type="email"
+              v-model="email"
+              class="w-full bg-white border border-slate-200 rounded-lg pl-10 pr-3.5 py-2 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition-all"
+              placeholder="Enter your email address"
+              autocomplete="email"
+            />
+          </div>
         </div>
 
-        <div class="field">
-          <label>Password</label>
-          <div class="password-wrap">
+        <!-- Password Field -->
+        <div class="space-y-1.5 text-left">
+          <label class="block text-sm font-semibold text-slate-700">Password</label>
+          <div class="relative">
+            <IconLock
+              class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
+            />
             <input
               :type="showPassword ? 'text' : 'password'"
-              placeholder="Enter your password"
               v-model="password"
+              class="w-full bg-white border border-slate-200 rounded-lg pl-10 pr-10 py-2 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition-all"
+              placeholder="Enter your password"
               autocomplete="current-password"
             />
-            <button type="button" class="eye-btn" @click="showPassword = !showPassword">
-              <svg
-                v-if="showPassword"
-                width="18" height="18" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor" stroke-width="2"
-              >
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
-              <svg
-                v-else
-                width="18" height="18" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor" stroke-width="2"
-              >
-                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                <line x1="1" y1="1" x2="23" y2="23" />
-              </svg>
+            <button
+              type="button"
+              @click="showPassword = !showPassword"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-0.5 cursor-pointer flex items-center"
+            >
+              <IconEyeOff v-if="!showPassword" class="w-4 h-4" />
+              <IconEye v-else class="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        <button type="submit" class="submit-btn" :disabled="loading">
-          {{ loading ? 'Signing in...' : 'Sign in' }}
+        <!-- Options Row -->
+        <div class="flex items-center justify-between text-sm mt-1">
+          <label
+            class="flex items-center gap-2 cursor-pointer text-slate-600 hover:text-slate-800 transition-colors select-none"
+          >
+            <input
+              type="checkbox"
+              v-model="rememberMe"
+              class="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900/20"
+            />
+            <span>Remember me</span>
+          </label>
+          <a
+            href="#"
+            class="text-slate-600 hover:text-slate-800 hover:underline transition-colors font-medium"
+            >Forget password</a
+          >
+        </div>
+
+        <!-- Sign In Button -->
+        <button
+          type="submit"
+          :disabled="loading"
+          class="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 rounded-lg transition-all text-sm mt-4 disabled:opacity-70 active:scale-[0.99] cursor-pointer shadow-sm"
+        >
+          {{ loading ? 'Signing in...' : 'Sign In' }}
         </button>
       </form>
-
-      <div class="demo-info">
-        <p class="demo-label">Staging Account</p>
-        <p class="demo-creds">superadmin@example.com / Password123!</p>
-      </div>
     </div>
   </div>
 </template>
 
+<style scoped>
+/* Ensure custom inputs don't have focus rings that override custom borders */
+input:focus {
+  outline: none;
+}
+</style>

@@ -1,8 +1,10 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/services/api'
+import { loadCachedUser, cacheUser, preseedUserCache, cacheUserRecord, loadUserRecord } from '@/services/auth-cache'
+import { buildUser, buildFallbackProfile } from '@/services/auth-helpers'
 
-type UserProfile = Record<string, unknown> & {
+export type UserProfile = Record<string, unknown> & {
   first_name?: string
   last_name?: string
   email?: string
@@ -15,35 +17,50 @@ type UserProfile = Record<string, unknown> & {
   name?: string
 }
 
-const USER_CACHE_KEY = 'user_profile'
+function extractProfile(response: { data: unknown }): UserProfile | null {
+  const data = response.data as Record<string, unknown>
+  if (data.success && data.data) return data.data as UserProfile
+  if ((data as Record<string, unknown>).email) return data as UserProfile
+  if (data.data && typeof data.data === 'object' && 'email' in (data.data as Record<string, unknown>)) return data.data as UserProfile
+  if (data.user_id) return data as UserProfile
+  if (data.data && typeof data.data === 'object' && 'user_id' in (data.data as Record<string, unknown>)) return data.data as UserProfile
+  return null
+}
 
-function loadCachedUser(): UserProfile | null {
+function extractToken(response: { data: unknown }): string | null {
+  const d = response.data as Record<string, unknown>
+  if (d.success && d.data && typeof d.data === 'object' && 'access_token' in (d.data as Record<string, unknown>)) return (d.data as Record<string, unknown>).access_token as string
+  if (d.access_token) return d.access_token as string
+  if (d.data && typeof d.data === 'object' && 'access_token' in (d.data as Record<string, unknown>)) return (d.data as Record<string, unknown>).access_token as string
+  if (d.token) return d.token as string
+  return null
+}
+
+function isProfileComplete(p: UserProfile | null): boolean {
+  return !!(p && p.email && (p.first_name || p.last_name))
+}
+
+function extractUsersList(response: { data: unknown }): Record<string, unknown>[] {
+  const data = response.data as Record<string, unknown>
+  if (data.success && Array.isArray(data.data)) return data.data as Record<string, unknown>[]
+  if (Array.isArray(data)) return data as Record<string, unknown>[]
+  if (Array.isArray(data.data)) return data.data as Record<string, unknown>[]
+  return []
+}
+
+function clearHeuristicCache(email: string): void {
+  const key = 'cached_user_record_' + email.toLowerCase()
+  const cachedRaw = localStorage.getItem(key)
+  if (!cachedRaw) return
   try {
-    const raw = localStorage.getItem(USER_CACHE_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    if (!parsed || typeof parsed !== 'object') return null
-    return parsed as UserProfile
+    const cachedObj = JSON.parse(cachedRaw)
+    const first = cachedObj?.first_name || ''
+    const emailPrefix = email.split('@')[0] || ''
+    if (first.toLowerCase() === 'newuser' || first.toLowerCase() === 'user' || first.toLowerCase() === emailPrefix.toLowerCase()) {
+      localStorage.removeItem(key)
+    }
   } catch {
-    return null
-  }
-}
-
-function cacheUser(u: UserProfile | null) {
-  if (u) {
-    localStorage.setItem(USER_CACHE_KEY, JSON.stringify(u))
-  } else {
-    localStorage.removeItem(USER_CACHE_KEY)
-  }
-}
-
-function buildUser(data: UserProfile): UserProfile {
-  const email = data.email || ''
-  const localImage = email ? localStorage.getItem('cached_profile_image_' + email) : null
-  return {
-    ...data,
-    profile_image: localImage || data.profile_image || null,
-    name: [data.first_name, data.last_name].filter((v): v is string => !!v).join(' ') || data.email || 'User',
+    localStorage.removeItem(key)
   }
 }
 
@@ -52,135 +69,106 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<UserProfile | null>(loadCachedUser())
 
   async function fetchProfile() {
+    if (!isAuthenticated.value) return null
+
+    preseedUserCache()
+
+    let profileData: UserProfile | null = null
+    let apiFailed = false
+
     try {
-      if (!isAuthenticated.value) return null
-
-      let profileData: UserProfile | null = null
-
-      // Attempt 1: Try /users/profile endpoint
-      try {
-        const response = await api.get('/users/profile')
-        if (response.data) {
-          if (response.data.success && response.data.data) {
-            profileData = response.data.data as UserProfile
-          } else if (response.data.email) {
-            profileData = response.data as UserProfile
-          } else if (response.data.data && response.data.data.email) {
-            profileData = response.data.data as UserProfile
-          } else if (response.data.user_id) {
-            // If the staging server returns only the JWT payload (e.g. user_id, entity_type, roles)
-            profileData = response.data as UserProfile
-          } else if (response.data.data && response.data.data.user_id) {
-            profileData = response.data.data as UserProfile
-          }
-        }
-      } catch (err) {
-        console.warn('Failed to fetch from /users/profile, attempting fallback to /users list...', err)
-      }
-
-      // Check if profileData has names and email. If not, we need to fetch them from users list or heuristics.
-      const isComplete = !!(profileData && profileData.email && (profileData.first_name || profileData.last_name))
-
-      // Attempt 2: Fallback to /users endpoint if profileData is incomplete
-      const userEmail = localStorage.getItem('user_email')
-      if (!isComplete) {
-        try {
-          const response = await api.get('/users')
-          let usersList: Record<string, unknown>[] = []
-          if (response.data?.success && Array.isArray(response.data.data)) {
-            usersList = response.data.data as Record<string, unknown>[]
-          } else if (Array.isArray(response.data)) {
-            usersList = response.data as Record<string, unknown>[]
-          } else if (Array.isArray(response.data?.data)) {
-            usersList = response.data.data as Record<string, unknown>[]
-          }
-
-          // Match by user_id/id or email
-          const targetId = profileData?.user_id || profileData?.id
-          const found = usersList.find((u) => 
-            (targetId && String(u['id']) === targetId) || 
-            (userEmail && typeof u['email'] === 'string' && u['email'].toLowerCase() === userEmail.toLowerCase())
-          )
-          
-          if (found) {
-            // Keep roles and other fields from profileData if they are not in the found object
-            profileData = {
-              ...profileData,
-              ...found
-            } as UserProfile
-            console.log('Successfully retrieved complete user profile from users list for id:', targetId)
-          }
-        } catch (err) {
-          console.warn('Fallback to /users list failed:', err)
-        }
-      }
-
-      // Re-evaluate completeness
-      const isNowComplete = !!(profileData && profileData.email && (profileData.first_name || profileData.last_name))
-
-      // Attempt 3: Local heuristics fallback using email address if still incomplete
-      if (!isNowComplete && userEmail) {
-        const cached = loadCachedUser()
-        if (cached && cached.email === userEmail && cached.first_name) {
-          profileData = cached
-        } else {
-          // Parse name from email (e.g. superadmin@example.com -> Super Admin)
-          const namePart = userEmail.split('@')[0] || 'User'
-          const parts = namePart.split(/[\._-]/)
-          const first = parts[0] ? parts[0].charAt(0).toUpperCase() + parts[0].slice(1) : 'User'
-          const last = parts[1] ? parts[1].charAt(0).toUpperCase() + parts[1].slice(1) : ''
-          
-          profileData = {
-            ...profileData,
-            email: userEmail,
-            first_name: first,
-            last_name: last,
-            entity_type: profileData?.entity_type || (userEmail.includes('admin') ? 'admin' : 'user'),
-            roles: profileData?.roles || (userEmail.includes('admin') ? ['ADMIN'] : ['USER']),
-          }
-        }
-      }
-
-      if (profileData) {
-        user.value = buildUser(profileData)
-        cacheUser(user.value)
-        return user.value
-      }
-    } catch (error) {
-      console.error('Failed to fetch user profile:', error)
+      profileData = extractProfile(await api.get('/users/profile'))
+    } catch {
+      apiFailed = true
     }
+
+    let isComplete = isProfileComplete(profileData)
+    const userEmail = localStorage.getItem('user_email')
+
+    if (!isComplete && userEmail) {
+      const cached = loadUserRecord(userEmail)
+      if (cached) {
+        profileData = { ...profileData, ...cached }
+        isComplete = isProfileComplete(profileData)
+      }
+    }
+
+    const userId = (profileData?.id || profileData?.user_id) as string | undefined
+    if (!isComplete && userId) {
+      try {
+        const payload = extractProfile(await api.get(`/users/${userId}`))
+        if (payload && (payload.email || payload.first_name)) {
+          profileData = { ...profileData, ...payload }
+          isComplete = isProfileComplete(profileData)
+          apiFailed = false
+        }
+      } catch {
+        // Silently continue
+      }
+    }
+
+    if (!isComplete) {
+      try {
+        const usersList = extractUsersList(await api.get('/users'))
+        const targetId = profileData?.user_id || profileData?.id
+        const found = usersList.find(
+          (u) =>
+            (targetId && String(u['id']) === targetId) ||
+            (userEmail &&
+              typeof u['email'] === 'string' &&
+              u['email'].toLowerCase() === userEmail.toLowerCase()),
+        )
+        if (found) {
+          profileData = { ...profileData, ...found } as UserProfile
+          isComplete = true
+          apiFailed = false
+        }
+      } catch {
+        // Silently continue
+      }
+    }
+
+    if (apiFailed && userEmail) {
+      const cached = loadCachedUser()
+      if (cached && cached.email === userEmail) {
+        user.value = cached
+        return cached
+      }
+    }
+
+    if (!isComplete && userEmail) {
+      profileData = buildFallbackProfile(userEmail, profileData)
+    }
+
+    if (profileData) {
+      const built = buildUser(profileData)
+      user.value = built
+      cacheUser(built)
+      if (built.email) {
+        cacheUserRecord(built.email, built)
+      }
+      return built
+    }
+
     return null
   }
 
   async function login(credentials: { email: string; password: string }) {
     try {
       const response = await api.post('/auth/login', credentials)
-      let token: string | null = null
-
-      if (response.data) {
-        if (response.data.success && response.data.data?.access_token) {
-          token = response.data.data.access_token
-        } else if (response.data.access_token) {
-          token = response.data.access_token
-        } else if (response.data.data?.access_token) {
-          token = response.data.data.access_token
-        } else if (response.data.token) {
-          token = response.data.token
-        }
-      }
+      const token = extractToken(response)
 
       if (token) {
+        clearHeuristicCache(credentials.email)
+        localStorage.removeItem('user_profile')
         localStorage.setItem('access_token', token)
         localStorage.setItem('user_email', credentials.email)
         isAuthenticated.value = true
-
         await fetchProfile()
-
         return true
       }
       return false
     } catch (error) {
-      console.error('Login failed:', error)
       throw error
     }
   }
@@ -198,19 +186,14 @@ export const useAuthStore = defineStore('auth', () => {
 
   function updateUserLocal(data: Partial<UserProfile>) {
     if (user.value) {
-      user.value = buildUser({
-        ...user.value,
-        ...data,
-      })
+      user.value = buildUser({ ...user.value, ...data })
       cacheUser(user.value)
     }
   }
 
-  // Auto-fetch profile on store initialization if token is present
   if (isAuthenticated.value) {
     fetchProfile()
   }
 
   return { isAuthenticated, user, fetchProfile, login, logout, updateUserLocal }
 })
-

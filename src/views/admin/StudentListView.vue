@@ -14,8 +14,11 @@ import {
   IconRefresh,
   IconCircleDot,
   IconEdit,
+  IconCopy,
+  IconTrash,
 } from '@tabler/icons-vue'
 import { getErrorMessage } from '@/services/api'
+import type { CreateStudentPayload, UpdateStudentPayload } from '@/types/student'
 import { useToastStore } from '@/stores/toast'
 
 const router = useRouter()
@@ -23,7 +26,10 @@ const store = useStudentsStore()
 const classesStore = useClassesStore()
 const toastStore = useToastStore()
 
-const searchQuery = inject<Ref<string>>('searchQuery', ref(''))
+import { useDebounce } from '@/services/utils'
+
+const rawSearchQuery = inject<Ref<string>>('searchQuery', ref(''))
+const searchQuery = useDebounce(rawSearchQuery, 250)
 const selectedStatus = ref('')
 
 const statusCounts = computed(() => ({
@@ -199,18 +205,17 @@ function closeAddModal() {
   isAddModalOpen.value = false
 }
 
-async function handleCreateStudent(payload: Record<string, unknown>, file: File | null) {
+async function handleCreateStudent(payload: CreateStudentPayload, file: File | null) {
   try {
     await store.createStudent(payload, file)
     closeAddModal()
     toastStore.showToast('Student added successfully!')
   } catch (err: unknown) {
-    console.error('Failed to add student:', err)
     toastStore.showToast(getErrorMessage(err, 'Failed to add student'), 'error')
   }
 }
 
-async function handleSaveStudent(payload: Record<string, unknown>, file: File | null) {
+async function handleSaveStudent(payload: UpdateStudentPayload, file: File | null) {
   const studentData = editingStudent.value
   if (!studentData) return
   try {
@@ -218,7 +223,6 @@ async function handleSaveStudent(payload: Record<string, unknown>, file: File | 
     closeEditModal()
     toastStore.showToast('Student updated successfully!')
   } catch (err: unknown) {
-    console.error('Failed to update student in database:', err)
     toastStore.showToast(getErrorMessage(err, 'Failed to update student'), 'error')
   }
 }
@@ -286,7 +290,7 @@ onUnmounted(() => {
       <div class="bg-white rounded-[5px] border border-slate-100 p-3 flex flex-wrap items-center gap-3 shadow-sm">
         <div class="relative flex-1 min-w-[240px] max-w-md">
           <input
-            v-model="searchQuery"
+            v-model="rawSearchQuery"
             type="text"
             placeholder="Search by name, code or class..."
             class="w-full bg-[#f1f3f9] text-[#1e293b] rounded-[3px] py-1.5 pl-8 pr-3 text-xs border border-transparent outline-none focus:bg-[#f1f3f9]"
@@ -397,7 +401,7 @@ onUnmounted(() => {
                         class="p-1.5 rounded-[5px] text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-all"
                         title="Delete"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
+                        <IconTrash class="w-4 h-4" />
                       </button>
                     </div>
                   </td>

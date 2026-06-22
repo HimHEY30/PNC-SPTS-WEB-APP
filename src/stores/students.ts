@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { api, getErrorMessage } from '@/services/api'
+import type { CreateStudentPayload, UpdateStudentPayload } from '@/types/student'
 
 export interface ApiStudent {
   id: string
@@ -60,8 +61,7 @@ function loadCached(): DisplayStudent[] {
 function cacheData(data: DisplayStudent[]) {
   try {
     localStorage.setItem(STUDENTS_CACHE_KEY, JSON.stringify(data))
-  } catch {
-  }
+  } catch {}
 }
 
 function fmt(val: unknown): string {
@@ -69,9 +69,37 @@ function fmt(val: unknown): string {
   return String(val)
 }
 
+// Normalize API response that may contain snake_case or camelCase fields
+function toApiStudent(data: Record<string, unknown>): ApiStudent {
+  return {
+    id: (data.id ?? '') as string,
+    studentCode: (data.studentCode ?? data.student_code ?? '') as string,
+    firstName: (data.firstName ?? data.first_name ?? '') as string,
+    lastName: (data.lastName ?? data.last_name ?? '') as string,
+    gender: (data.gender ?? null) as 'male' | 'female' | 'other' | null,
+    dateOfBirth: (data.dateOfBirth ?? data.date_of_birth ?? null) as string | null,
+    placeOfBirth: (data.placeOfBirth ?? data.place_of_birth ?? null) as string | null,
+    phone: (data.phone ?? null) as string | null,
+    email: (data.email ?? null) as string | null,
+    profileImage: (data.profileImage ?? data.profile_image ?? null) as string | null,
+    status: (data.status ?? 'active') as 'active' | 'suspended' | 'graduated',
+    classId: (data.classId ?? data.class_id ?? null) as string | null,
+    createdAt: (data.createdAt ?? data.created_at ?? '') as string,
+    updatedAt: (data.updatedAt ?? data.updated_at ?? '') as string,
+    deletedAt: (data.deletedAt ?? data.deleted_at ?? null) as string | null,
+    createdBy: (data.createdBy ?? data.created_by ?? null) as string | null,
+    updatedBy: (data.updatedBy ?? data.updated_by ?? null) as string | null,
+  }
+}
+
 function toDisplay(s: ApiStudent): DisplayStudent {
   const dob = s.dateOfBirth
-    ? new Date(s.dateOfBirth).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })
+    ? new Date(s.dateOfBirth).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        timeZone: 'UTC',
+      })
     : '—'
   const genderMap: Record<string, string> = { male: 'Male', female: 'Female', other: 'Other' }
   return {
@@ -80,7 +108,7 @@ function toDisplay(s: ApiStudent): DisplayStudent {
     firstName: s.firstName,
     lastName: s.lastName,
     name: `${s.firstName} ${s.lastName}`,
-    gender: s.gender ? genderMap[s.gender] ?? s.gender : '—',
+    gender: s.gender ? (genderMap[s.gender] ?? s.gender) : '—',
     dateOfBirth: dob,
     placeOfBirth: fmt(s.placeOfBirth),
     phone: fmt(s.phone),
@@ -88,9 +116,26 @@ function toDisplay(s: ApiStudent): DisplayStudent {
     profileImage: s.profileImage,
     status: s.status.charAt(0).toUpperCase() + s.status.slice(1),
     classId: fmt(s.classId),
-    createdAt: new Date(s.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' }),
-    updatedAt: new Date(s.updatedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' }),
-    deletedAt: s.deletedAt ? new Date(s.deletedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' }) : '—',
+    createdAt: new Date(s.createdAt).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    }),
+    updatedAt: new Date(s.updatedAt).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    }),
+    deletedAt: s.deletedAt
+      ? new Date(s.deletedAt).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          timeZone: 'UTC',
+        })
+      : '—',
     createdBy: fmt(s.createdBy),
     updatedBy: fmt(s.updatedBy),
   }
@@ -107,17 +152,17 @@ export const useStudentsStore = defineStore('students', () => {
     error.value = null
     try {
       const response = await api.get('/students')
-      
+
+      // Unwrap nested response: { data: { data: [...] } }
       const payload = response.data?.data ?? response.data
+      const unwrapped = payload?.data ?? payload
       let raw: ApiStudent[] = []
-      if (Array.isArray(payload)) {
-        raw = payload
-      } else if (payload && Array.isArray(payload.data)) {
-        raw = payload.data
+      if (Array.isArray(unwrapped)) {
+        raw = unwrapped
       }
 
-      const fetchedList = raw.map(toDisplay)
-      
+      const fetchedList = raw.map((item) => toDisplay(toApiStudent(item as unknown as Record<string, unknown>)))
+
       students.value = fetchedList
       cacheData(students.value)
       fetched.value = true
@@ -132,35 +177,34 @@ export const useStudentsStore = defineStore('students', () => {
     }
   }
 
-  async function createStudent(payload: Record<string, unknown>, file?: File | null) {
+  async function createStudent(payload: CreateStudentPayload, file?: File | null) {
     loading.value = true
     error.value = null
     try {
-      let response;
+      const body = { ...payload } as Record<string, unknown>
+      if (body.profileImage === undefined) {
+        delete body.profileImage
+      }
+
+      let response
       if (file) {
         const fd = new FormData()
         fd.append('image', file)
-        Object.keys(payload).forEach(key => {
-          if (payload[key] !== undefined && payload[key] !== null) {
-            fd.append(key, String(payload[key]))
+        Object.keys(body).forEach((key) => {
+          if (body[key] !== undefined && body[key] !== null) {
+            fd.append(key, String(body[key]))
           }
         })
         response = await api.post('/students', fd)
       } else {
-        const cleanPayload = { ...payload }
-        delete cleanPayload['status']
-        delete cleanPayload['profileImage']
-        response = await api.post('/students', cleanPayload)
+        response = await api.post('/students', body)
       }
-      
-      const created: ApiStudent = response.data?.data ?? response.data
-      
-      // Preserve local profileImage preview if backend didn't return it
-      if (!created.profileImage && typeof payload['profileImage'] === 'string') {
-        created.profileImage = payload['profileImage']
-      }
-      
-      const disp = toDisplay(created)
+
+      // Unwrap nested response: { data: { data: actualObject } }
+      const createdRaw = response.data?.data ?? response.data
+      const created = createdRaw?.data ?? createdRaw
+
+      const disp = toDisplay(toApiStudent(created))
       students.value.unshift(disp)
       cacheData(students.value)
       return disp
@@ -172,35 +216,39 @@ export const useStudentsStore = defineStore('students', () => {
     }
   }
 
-  async function updateStudent(id: string, payload: Record<string, unknown>, file?: File | null) {
+  async function updateStudent(id: string, payload: UpdateStudentPayload, file?: File | null) {
     loading.value = true
     error.value = null
     try {
-      let response;
+      const body = { ...payload } as Record<string, unknown>
+      if (body.profileImage === undefined) {
+        delete body.profileImage
+      }
+
+      let response
       if (file) {
         const fd = new FormData()
         fd.append('image', file)
-        Object.keys(payload).forEach(key => {
-          if (payload[key] !== undefined && payload[key] !== null) {
-            fd.append(key, String(payload[key]))
+        Object.keys(body).forEach((key) => {
+          if (body[key] !== undefined && body[key] !== null) {
+            fd.append(key, String(body[key]))
           }
         })
         response = await api.patch(`/students/${id}`, fd)
       } else {
-        const cleanPayload = { ...payload }
-        delete cleanPayload['profileImage']
-        response = await api.patch(`/students/${id}`, cleanPayload)
+        response = await api.patch(`/students/${id}`, body)
       }
 
-      const updated: ApiStudent = response.data?.data ?? response.data
-      
-      // Preserve local profileImage preview if backend didn't return it
-      if (!updated.profileImage && typeof payload['profileImage'] === 'string') {
-        updated.profileImage = payload['profileImage']
+      // Unwrap nested response: { data: { data: actualObject } }
+      const updatedRaw = response.data?.data ?? response.data
+      const updated = updatedRaw?.data ?? updatedRaw
+
+      if (!updated || !updated.id && !(updated.firstName || updated.first_name)) {
+        return await fetchStudentById(id)
       }
-      
-      const disp = toDisplay(updated)
-      const idx = students.value.findIndex(s => s.id === id)
+
+      const disp = toDisplay(toApiStudent(updated))
+      const idx = students.value.findIndex((s) => s.id === id)
       if (idx !== -1) {
         students.value[idx] = disp
       }
@@ -214,13 +262,40 @@ export const useStudentsStore = defineStore('students', () => {
     }
   }
 
-  return { 
-    students, 
-    loading, 
-    error, 
-    fetched, 
-    fetchStudents, 
-    createStudent, 
-    updateStudent 
+  async function fetchStudentById(id: string) {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await api.get(`/students/${id}`)
+      const payload = response.data?.data ?? response.data
+      const unwrapped = payload?.data ?? payload
+      const disp = toDisplay(toApiStudent(unwrapped))
+      
+      const idx = students.value.findIndex((s) => s.id === id)
+      if (idx !== -1) {
+        students.value[idx] = disp
+      } else {
+        students.value.push(disp)
+      }
+      cacheData(students.value)
+      return disp
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } }; message?: string }
+      error.value = err?.response?.data?.message ?? err?.message ?? 'Failed to fetch student details'
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  return {
+    students,
+    loading,
+    error,
+    fetched,
+    fetchStudents,
+    fetchStudentById,
+    createStudent,
+    updateStudent,
   }
 })

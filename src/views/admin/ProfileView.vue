@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 import { api, getErrorMessage } from '@/services/api'
@@ -8,27 +8,22 @@ import {
   IconCheck,
   IconArrowLeft,
   IconEdit,
-  IconDeviceFloppy,
-  IconCircleOff,
   IconPhotoUp,
-  IconBrandTwitter,
-  IconBrandFacebook,
-  IconBrandLinkedin,
-  IconBrandPinterest,
-  IconDots,
-  IconActivity,
-  IconListCheck,
-  IconDatabase,
   IconCalendar,
-  IconGitFork,
-  IconMessageCircle,
-  IconFileText,
+  IconWorld,
+  IconBriefcase,
+  IconSchool,
+  IconPlus,
+  IconX,
+  IconChevronUp,
+  IconMail,
 } from '@tabler/icons-vue'
+import bannerSrc from '@/assets/images/profile_banner.jpg'
 
 const auth = useAuthStore()
 const router = useRouter()
 
-const editing = ref(false)
+const showEditModal = ref(false)
 const saving = ref(false)
 const error = ref('')
 const success = ref('')
@@ -36,11 +31,32 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const selectedFile = ref<File | null>(null)
 const previewUrl = ref<string | null>(null)
 
-const form = reactive({
+const activeTab = ref('Overview')
+const tabs = ['Overview', 'Groups', 'Posts', 'Pages', 'Events', 'More']
+
+// Backend-backed form fields
+const editForm = reactive({
   first_name: '',
   last_name: '',
-  email: '',
   phone: '',
+})
+
+// Extra fields stored in localStorage (associated with user's email)
+const extra = reactive({
+  bio: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. \n\nUt enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.\n\nDuis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.',
+  pronouns: 'He / Him / His',
+  nickname: '',
+  languages: 'English, Khmer',
+  workHistory: 'Passerelles Numériques Cambodia',
+  education: 'PNC Training Center',
+  location: 'Phnom Penh, Cambodia',
+  tags: [
+    { text: 'Academic Tracking', count: 42 },
+    { text: 'Student Mentoring', count: 1 },
+    { text: 'Curriculum Design', count: 132 },
+    { text: 'Web Development', count: 24 },
+    { text: 'Community Building', count: 18 },
+  ] as Array<{ text: string; count: number }>
 })
 
 const currentAvatar = computed(() => {
@@ -48,23 +64,49 @@ const currentAvatar = computed(() => {
   return auth.user?.profile_image || null
 })
 
-function startEdit() {
-  form.first_name = auth.user?.first_name || ''
-  form.last_name = auth.user?.last_name || ''
-  form.email = auth.user?.email || ''
-  form.phone = auth.user?.phone || ''
+const roleTitle = computed(() => {
+  const roles = auth.user?.roles || []
+  if (roles.includes('SUPER_ADMIN')) return 'Super Admin'
+  const entity = auth.user?.entity_type?.replace(/_/g, ' ') || 'Academic'
+  return `VP of ${entity} Operations`
+})
+
+function loadExtra() {
+  const email = auth.user?.email || ''
+  if (!email) return
+  const cached = localStorage.getItem('profile_extra_' + email)
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached)
+      Object.assign(extra, parsed)
+    } catch {
+      // Silently skip
+    }
+  } else {
+    extra.nickname = auth.user?.first_name || ''
+  }
+}
+
+onMounted(() => {
+  loadExtra()
+})
+
+function openEditModal() {
+  editForm.first_name = auth.user?.first_name || ''
+  editForm.last_name = auth.user?.last_name || ''
+  editForm.phone = auth.user?.phone || ''
+  
   selectedFile.value = null
   previewUrl.value = null
-  editing.value = true
+  showEditModal.value = true
   error.value = ''
   success.value = ''
 }
 
-function cancelEdit() {
-  editing.value = false
+function closeEditModal() {
+  showEditModal.value = false
   selectedFile.value = null
   previewUrl.value = null
-  error.value = ''
 }
 
 function triggerFileSelect() {
@@ -94,9 +136,7 @@ async function saveEdit() {
     try {
       const imgFd = new FormData()
       imgFd.append('image', selectedFile.value)
-      // The endpoint in UsersController is @Post('profile/image')
       const imgRes = await api.post('/users/profile/image', imgFd)
-      // The interceptor might wrap it in { data: { url: ... } }
       profileImage = imgRes.data?.data?.url || imgRes.data?.url
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -109,9 +149,9 @@ async function saveEdit() {
   }
 
   const payload: Record<string, unknown> = {
-    first_name: form.first_name,
-    last_name: form.last_name,
-    phone: form.phone || null,
+    first_name: editForm.first_name,
+    last_name: editForm.last_name,
+    phone: editForm.phone || null,
   }
   if (profileImage) {
     payload.profileImage = profileImage
@@ -119,24 +159,23 @@ async function saveEdit() {
 
   try {
     try {
-      // Correct endpoint is /users/profile (PATCH)
       await api.patch('/users/profile', payload)
     } catch (err: unknown) {
       const errObj = err as { response?: { status?: number; data?: { statusCode?: number } } }
       const is404 = errObj?.response?.status === 404 || errObj?.response?.data?.statusCode === 404
       const userId = auth.user?.id || auth.user?.user_id
       if (is404 && userId) {
-        console.warn(`PATCH /users/profile returned 404, attempting fallback to PATCH /users/${userId}`)
         await api.patch(`/users/${userId}`, payload)
       } else {
         throw err
       }
     }
+    
     await auth.fetchProfile()
     success.value = uploadFailed 
       ? 'Profile text saved (Image saved locally only)' 
       : 'Profile updated successfully'
-    editing.value = false
+    showEditModal.value = false
   } catch (err: unknown) {
     error.value = getErrorMessage(err, 'Failed to update profile')
   } finally {
@@ -149,20 +188,24 @@ async function saveEdit() {
 function fmt(val: unknown): string {
   if (val === null || val === undefined) return '—'
   if (typeof val === 'string' && !isNaN(Date.parse(val))) {
-    return new Date(val).toLocaleString()
+    return new Date(val).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    })
   }
   return String(val)
 }
 </script>
 
 <template>
-  <div class="space-y-6 text-left max-w-[1600px] mx-auto pb-8">
+  <div class="space-y-6 text-left max-w-5xl pb-4">
     <!-- Header Back Navigation & Statuses -->
     <div class="flex items-center justify-between">
       <button
         id="profile-back-btn"
         @click="router.back()"
-        class="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 transition-colors"
+        class="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
       >
         <IconArrowLeft class="w-4 h-4" />
         Back
@@ -180,469 +223,428 @@ function fmt(val: unknown): string {
       </div>
     </div>
 
-    <!-- Layout Grid matching Screenshot -->
-    <div class="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-6 items-start">
-      
-      <!-- LEFT SIDEBAR PROFILE SUMMARY -->
-      <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-        <!-- Brand Color Header Banner -->
-        <div class="h-28 bg-[#3b4b6b] relative"></div>
+    <!-- Hidden input for file selection -->
+    <input
+      ref="fileInput"
+      type="file"
+      accept="image/*"
+      class="hidden"
+      @change="onFileSelected"
+    />
 
-        <!-- Overlapping Avatar -->
-        <div class="relative flex justify-center -mt-12">
-          <div class="relative group">
-            <div
-              v-if="currentAvatar"
-              class="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-md bg-white"
-            >
-              <img :src="currentAvatar" class="w-full h-full object-cover" alt="Avatar" />
+    <!-- Main 12-Column Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      
+      <!-- Left Column (8 cols) -->
+      <div class="lg:col-span-8 space-y-6">
+        
+        <!-- 1. PROFILE HEADER CARD (NO SOCIAL ICONS) -->
+        <div class="bg-white rounded-2xl border border-slate-200/60 overflow-hidden shadow-sm relative text-left">
+          
+          <!-- Banner Image -->
+          <div class="h-16 md:h-20 w-full overflow-hidden bg-slate-50 relative">
+            <img :src="bannerSrc" class="w-full h-full object-cover" alt="Banner" />
+          </div>
+
+          <!-- Avatar & Info block -->
+          <div class="relative flex flex-col sm:flex-row items-start justify-between px-6 pb-6 pt-2">
+            
+            <div class="flex flex-col sm:flex-row items-start sm:items-end">
+              <!-- Avatar overlapping the banner -->
+              <div class="relative w-24 h-24 sm:w-28 sm:h-28 -mt-14 sm:-mt-16 rounded-full border-4 border-white bg-slate-50 shadow-md overflow-hidden flex items-center justify-center select-none shrink-0 z-10">
+                <img v-if="currentAvatar" :src="currentAvatar" class="w-full h-full object-cover" alt="Avatar" />
+                <IconUser v-else class="w-10 h-10 text-slate-400" />
+                <!-- Edit button for picture change -->
+                <button
+                  id="profile-avatar-upload-btn"
+                  @click="triggerFileSelect"
+                  class="absolute inset-0 bg-black/45 hover:bg-black/55 flex items-center justify-center text-white cursor-pointer opacity-0 hover:opacity-100 transition-opacity duration-200 z-20"
+                >
+                  <IconPhotoUp class="w-5 h-5" />
+                </button>
+                <!-- Online Status Dot -->
+                <span class="absolute bottom-1 right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white shadow-sm z-10"></span>
+              </div>
+
+              <!-- Information Block -->
+              <div class="mt-4 sm:mt-0 sm:ml-5 pb-1">
+                <h2 class="text-base md:text-lg font-bold text-slate-800 tracking-tight leading-none mb-1">
+                  {{ auth.user?.name || 'User' }}
+                </h2>
+                <p class="text-xs text-slate-500 font-semibold capitalize leading-none">
+                  {{ roleTitle }}
+                </p>
+                
+                <!-- Location Badge -->
+                <div class="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 bg-slate-100/80 text-slate-500 rounded text-[10px] font-semibold leading-none">
+                  <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                  {{ extra.location }}
+                </div>
+              </div>
             </div>
-            <div
-              v-else
-              class="w-24 h-24 rounded-full bg-slate-200 border-4 border-white shadow-md flex items-center justify-center"
-            >
-              <IconUser class="w-10 h-10 text-slate-400" />
+
+            <!-- Edit Button on Right -->
+            <div class="mt-4 sm:mt-0 shrink-0">
+              <button
+                id="profile-edit-btn"
+                @click="openEditModal"
+                class="inline-flex items-center gap-1.5 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all shadow-sm cursor-pointer"
+              >
+                <IconEdit class="w-3.5 h-3.5 text-slate-500" />
+                Edit Profile
+              </button>
             </div>
-            <button
-              id="profile-avatar-upload-btn"
-              v-if="editing"
-              @click="triggerFileSelect"
-              class="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center cursor-pointer hover:bg-black/65 transition-colors"
-            >
-              <IconPhotoUp class="w-6 h-6 text-white" />
-            </button>
-            <!-- Green active dot -->
-            <span class="absolute bottom-1 right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white shadow-sm"></span>
+
+          </div>
+
+        </div>
+
+        <!-- 2. TAB NAVIGATION BAR -->
+        <div class="flex gap-2 p-1 bg-slate-100/50 rounded-xl border border-slate-200/50">
+          <button
+            v-for="tab in tabs"
+            :key="tab"
+            @click="activeTab = tab"
+            :class="[
+              'px-4 py-1.5 text-xs rounded-lg transition-all cursor-pointer',
+              activeTab === tab 
+                ? 'bg-white text-slate-800 font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)]' 
+                : 'text-slate-400 hover:text-slate-700 font-medium hover:bg-white/50'
+            ]"
+          >
+            {{ tab }}
+          </button>
+        </div>
+
+        <!-- Tab contents (Render details for active tab Overview) -->
+        <template v-if="activeTab === 'Overview'">
+          
+          <!-- 3. SUMMARY CARD -->
+          <div class="bg-white rounded-2xl border border-slate-200/60 p-6 shadow-sm relative text-left">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-sm font-bold text-slate-800">Summary</h3>
+              <button
+                @click="openEditModal"
+                class="p-1.5 rounded-[5px] text-slate-400 hover:text-[#059669] hover:bg-emerald-50 transition-all cursor-pointer animate-none"
+                title="Edit Summary"
+              >
+                <IconEdit class="w-4 h-4" />
+              </button>
+            </div>
+            <div class="text-xs text-slate-500 leading-relaxed font-semibold whitespace-pre-line">
+              {{ extra.bio }}
+            </div>
+          </div>
+
+          <!-- 4. ASK ME ABOUT CARD -->
+          <div class="bg-white rounded-2xl border border-slate-200/60 p-6 shadow-sm relative text-left">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-sm font-bold text-slate-800">Ask Me About</h3>
+              <button
+                @click="openEditModal"
+                class="p-1.5 rounded-[5px] text-slate-400 hover:text-[#059669] hover:bg-emerald-50 transition-all cursor-pointer animate-none"
+                title="Edit Tags"
+              >
+                <IconEdit class="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div class="flex flex-wrap gap-2">
+              <div 
+                v-for="(tag, idx) in extra.tags" 
+                :key="tag.text"
+                :class="[
+                  'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors',
+                  idx === 0 
+                    ? 'bg-emerald-50 border-emerald-100 text-emerald-700' 
+                    : 'bg-slate-50 border-slate-200/60 text-slate-600 hover:bg-slate-100'
+                ]"
+              >
+                <span v-if="idx === 0" class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span v-else class="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                {{ tag.text }}
+                <span class="text-[10px] text-slate-400">• {{ tag.count }}</span>
+              </div>
+              
+              <!-- Add Tag Button -->
+              <button 
+                @click="openEditModal" 
+                class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-50 border border-slate-200/60 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all cursor-pointer"
+              >
+                <IconPlus class="w-3.5 h-3.5" />
+                Add Tag
+              </button>
+            </div>
+          </div>
+          
+        </template>
+        
+        <template v-else>
+          <!-- Placeholder tabs -->
+          <div class="bg-white rounded-2xl border border-slate-200/60 p-12 shadow-sm text-center">
+            <IconUser class="w-10 h-10 text-slate-300 mx-auto mb-3" />
+            <h3 class="text-sm font-bold text-slate-700 mb-1">{{ activeTab }} Section</h3>
+            <p class="text-xs text-slate-400">Content for the {{ activeTab }} tab will be integrated here.</p>
+          </div>
+        </template>
+
+        <!-- 5. MY MANAGER (HIERARCHY TREE WITH CHEVRONS) -->
+        <div class="bg-white rounded-2xl border border-slate-200/60 p-6 shadow-sm text-left">
+          <h3 class="text-sm font-bold text-slate-800 mb-5">My Manager</h3>
+          
+          <div class="flex flex-col">
+            <!-- CEO -->
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200 overflow-hidden shrink-0">
+                <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&h=100&q=80" class="w-full h-full object-cover" alt="Roy Reznik" />
+              </div>
+              <div>
+                <h4 class="text-xs font-bold text-slate-800">Roy Reznik</h4>
+                <p class="text-[10px] text-slate-400 font-bold leading-tight">Chief Executive Officer</p>
+              </div>
+            </div>
+
+            <!-- Upward Arrow -->
+            <div class="flex pl-3.5 my-1.5">
+              <IconChevronUp class="w-3.5 h-3.5 text-emerald-500 stroke-[3]" />
+            </div>
+
+            <!-- COO -->
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200 overflow-hidden shrink-0">
+                <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=100&h=100&q=80" class="w-full h-full object-cover" alt="James Botosh" />
+              </div>
+              <div>
+                <h4 class="text-xs font-bold text-slate-800">James Botosh</h4>
+                <p class="text-[10px] text-slate-400 font-bold leading-tight">Chief Operating officer</p>
+              </div>
+            </div>
+
+            <!-- Upward Arrow -->
+            <div class="flex pl-3.5 my-1.5">
+              <IconChevronUp class="w-3.5 h-3.5 text-emerald-500 stroke-[3]" />
+            </div>
+
+            <!-- Current User (VP) -->
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-full border-2 border-emerald-500 bg-emerald-50 flex items-center justify-center overflow-hidden shrink-0 relative">
+                <img v-if="currentAvatar" :src="currentAvatar" class="w-full h-full object-cover" />
+                <IconUser v-else class="w-5 h-5 text-emerald-600" />
+              </div>
+              <div>
+                <h4 class="text-xs font-bold text-slate-800">{{ auth.user?.name || 'User' }}</h4>
+                <p class="text-[10px] text-slate-400 font-bold leading-tight capitalize">
+                  VP of {{ auth.user?.entity_type?.replace('_', ' ') || 'Academic' }} Operations
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Hidden input for file selection -->
-        <input
-          ref="fileInput"
-          type="file"
-          accept="image/*"
-          class="hidden"
-          @change="onFileSelected"
-        />
-
-        <!-- Name and Role -->
-        <div class="text-center mt-4 px-4">
-          <h1 class="text-lg font-bold text-slate-800 truncate">
-            {{ auth.user?.name || 'User' }}
-          </h1>
-          <p class="text-xs text-slate-400 capitalize mt-0.5 truncate">
-            {{ auth.user?.entity_type?.replace('_', ' ') || '' }}
-          </p>
-        </div>
-
-        <!-- Social Icons -->
-        <div class="flex items-center justify-center gap-2 mt-4 px-4">
-          <a href="#" id="social-twitter-link" class="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:text-[#3b4b6b] hover:border-slate-300 transition-colors">
-            <IconBrandTwitter class="w-4 h-4" />
-          </a>
-          <a href="#" id="social-facebook-link" class="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:text-[#3b4b6b] hover:border-slate-300 transition-colors">
-            <IconBrandFacebook class="w-4 h-4" />
-          </a>
-          <a href="#" id="social-linkedin-link" class="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:text-[#3b4b6b] hover:border-slate-300 transition-colors">
-            <IconBrandLinkedin class="w-4 h-4" />
-          </a>
-          <a href="#" id="social-pinterest-link" class="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:border-slate-300 transition-colors">
-            <IconBrandPinterest class="w-4 h-4" />
-          </a>
-          <button id="social-more-btn" class="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-colors">
-            <IconDots class="w-4 h-4" />
-          </button>
-        </div>
-
-        <div class="border-t border-slate-100 my-4"></div>
-
-        <!-- Sidebar Navigation Menu -->
-        <div class="px-2 space-y-1">
-          <button id="nav-activity-btn" class="w-full flex items-center gap-3 px-4 py-2 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded transition-colors text-left">
-            <IconActivity class="w-4 h-4" />
-            Activity
-          </button>
-          <button id="nav-tasks-btn" class="w-full flex items-center justify-between px-4 py-2 text-xs font-medium text-[#3b4b6b] bg-slate-50 border-l-2 border-[#3b4b6b] rounded-r transition-colors text-left">
-            <span class="flex items-center gap-3">
-              <IconListCheck class="w-4 h-4" />
-              Assigned Tasks
-            </span>
-          </button>
-          <button id="nav-storage-btn" class="w-full flex items-center gap-3 px-4 py-2 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded transition-colors text-left">
-            <IconDatabase class="w-4 h-4" />
-            Storage
-          </button>
-        </div>
-
-        <div class="border-t border-slate-100 my-4"></div>
-
-        <!-- Bio text -->
-        <div class="px-5 text-xs text-slate-500 leading-relaxed text-center">
-          Conversations can be a tricky business. Sometimes, decoding what is said with what is meant is difficult at best.
-        </div>
-
-        <!-- Tags/Skills -->
-        <div class="flex flex-wrap gap-1 px-5 mt-4 justify-center">
-          <span class="rounded-full bg-slate-100 text-slate-600 px-2.5 py-0.5 text-[10px] font-medium">Business</span>
-          <span class="rounded-full bg-slate-100 text-slate-600 px-2.5 py-0.5 text-[10px] font-medium">Management</span>
-          <span class="rounded-full bg-slate-100 text-slate-600 px-2.5 py-0.5 text-[10px] font-medium">UI/UX</span>
-          <span class="rounded-full bg-slate-100 text-slate-600 px-2.5 py-0.5 text-[10px] font-medium">Development</span>
-          <span class="rounded-full bg-slate-100 text-slate-600 px-2.5 py-0.5 text-[10px] font-medium">Marketing</span>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="grid grid-cols-2 gap-2 p-5 mt-6 border-t border-slate-50 bg-slate-50/50">
-          <button id="profile-send-msg-btn" class="rounded-[3px] bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold py-2 transition-colors shadow-sm">
-            Send Message
-          </button>
-          <button id="profile-subscribe-btn" class="rounded-[3px] bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-2 transition-colors border border-slate-200">
-            Subscribe
-          </button>
-        </div>
       </div>
 
-      <!-- RIGHT MAIN CONTENT PANEL -->
-      <div class="space-y-6">
-
-        <!-- 1. PROFILE DETAILS CARD -->
-        <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden text-left">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-sm font-semibold text-slate-800">Profile Information</h2>
-            
+      <!-- Right Column (4 cols) -->
+      <div class="lg:col-span-4 space-y-6">
+        
+        <!-- 6. ADDITIONAL DETAILS CARD -->
+        <div class="bg-white rounded-2xl border border-slate-200/60 p-6 shadow-sm text-left relative">
+          <div class="flex items-center justify-between mb-5">
+            <h3 class="text-sm font-bold text-slate-800">Additional Details</h3>
             <button
-              id="profile-edit-btn"
-              v-if="!editing"
-              @click="startEdit"
-              class="rounded-[3px] bg-slate-900 text-white text-xs px-3 py-1.5 flex items-center gap-1.5 hover:bg-slate-800 transition-colors"
+              @click="openEditModal"
+              class="p-1.5 rounded-[5px] text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all cursor-pointer animate-none"
+              title="Edit Details"
             >
-              <IconEdit class="w-3.5 h-3.5" />
-              Edit Profile
+              <IconEdit class="w-4 h-4" />
             </button>
-            <div v-else class="flex items-center gap-1.5">
-              <button
-                id="profile-save-btn"
-                @click="saveEdit"
-                :disabled="saving"
-                class="rounded-[3px] bg-[#3b4b6b] hover:bg-[#2e3b54] text-white text-xs px-3 py-1.5 flex items-center gap-1.5 transition-colors disabled:opacity-50"
-              >
-                <IconDeviceFloppy v-if="!saving" class="w-3.5 h-3.5" />
-                {{ saving ? 'Saving...' : 'Save' }}
-              </button>
-              <button
-                id="profile-cancel-btn"
-                @click="cancelEdit"
-                class="rounded-[3px] bg-white border border-slate-200 hover:bg-slate-50 text-slate-500 text-xs px-3 py-1.5 flex items-center gap-1.5 transition-colors"
-              >
-                <IconCircleOff class="w-3.5 h-3.5" />
-                Cancel
-              </button>
-            </div>
           </div>
-
-          <!-- Edit Form Fields -->
-          <div v-if="editing" class="p-6 space-y-4">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label for="profile-firstname-input" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">First Name</label>
-                <input
-                  id="profile-firstname-input"
-                  v-model="form.first_name"
-                  type="text"
-                  class="w-full rounded-[3px] border border-slate-200 px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:border-slate-400 bg-white"
-                  placeholder="Enter first name..."
-                />
+          
+          <div class="space-y-4">
+            
+            <!-- Email -->
+            <div class="flex items-start gap-3">
+              <div class="w-7 h-7 rounded-lg bg-slate-50 border border-slate-200/60 flex items-center justify-center text-slate-400 mt-0.5 shrink-0">
+                <IconMail class="w-4 h-4" />
               </div>
-              <div>
-                <label for="profile-lastname-input" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Last Name</label>
-                <input
-                  id="profile-lastname-input"
-                  v-model="form.last_name"
-                  type="text"
-                  class="w-full rounded-[3px] border border-slate-200 px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:border-slate-400 bg-white"
-                  placeholder="Enter last name..."
-                />
+              <div class="min-w-0 flex-1">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-1">Email</p>
+                <p class="text-xs font-bold text-emerald-600 truncate">{{ auth.user?.email || '—' }}</p>
               </div>
             </div>
-            <div>
-              <label for="profile-email-input" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Email Address</label>
+
+            <!-- Languages -->
+            <div class="flex items-start gap-3">
+              <div class="w-7 h-7 rounded-lg bg-slate-50 border border-slate-200/60 flex items-center justify-center text-slate-400 mt-0.5 shrink-0">
+                <IconWorld class="w-4 h-4" />
+              </div>
+              <div>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-1">Languages</p>
+                <p class="text-xs font-bold text-emerald-600">{{ extra.languages }}</p>
+              </div>
+            </div>
+
+            <!-- Nickname -->
+            <div class="flex items-start gap-3">
+              <div class="w-7 h-7 rounded-lg bg-slate-50 border border-slate-200/60 flex items-center justify-center text-slate-400 mt-0.5 shrink-0">
+                <IconUser class="w-4 h-4" />
+              </div>
+              <div>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-1">Nickname</p>
+                <p class="text-xs font-bold text-slate-700">{{ extra.nickname || '—' }}</p>
+              </div>
+            </div>
+
+            <!-- Join Date -->
+            <div class="flex items-start gap-3">
+              <div class="w-7 h-7 rounded-lg bg-slate-50 border border-slate-200/60 flex items-center justify-center text-slate-400 mt-0.5 shrink-0">
+                <IconCalendar class="w-4 h-4" />
+              </div>
+              <div>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-1">Join Date</p>
+                <p class="text-xs font-bold text-slate-700">{{ fmt(auth.user?.created_at) }}</p>
+              </div>
+            </div>
+
+            <!-- Work History -->
+            <div class="flex items-start gap-3">
+              <div class="w-7 h-7 rounded-lg bg-slate-50 border border-slate-200/60 flex items-center justify-center text-slate-400 mt-0.5 shrink-0">
+                <IconBriefcase class="w-4 h-4" />
+              </div>
+              <div>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-1">Work History</p>
+                <p class="text-xs font-bold text-emerald-600">{{ extra.workHistory }}</p>
+              </div>
+            </div>
+
+            <!-- Education -->
+            <div class="flex items-start gap-3">
+              <div class="w-7 h-7 rounded-lg bg-slate-50 border border-slate-200/60 flex items-center justify-center text-slate-400 mt-0.5 shrink-0">
+                <IconSchool class="w-4 h-4" />
+              </div>
+              <div>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-1">Education</p>
+                <p class="text-xs font-bold text-emerald-600">{{ extra.education }}</p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+      
+    </div>
+  </div>
+
+  <!-- EDIT PROFILE MODAL -->
+  <div
+    v-if="showEditModal"
+    class="fixed inset-0 z-[150] flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4 overflow-y-auto"
+  >
+    <div
+      @click.stop
+      class="bg-white rounded-lg w-full max-w-lg shadow-xl flex flex-col max-h-[90vh] text-left animate-none"
+    >
+      <!-- Header -->
+      <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <h3 class="text-sm font-bold text-slate-800">Edit Profile Details</h3>
+        <button
+          @click="closeEditModal"
+          class="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-lg"
+        >
+          <IconX class="w-4 h-4" />
+        </button>
+      </div>
+
+      <!-- Content -->
+      <div class="p-5 space-y-4 overflow-y-auto flex-1 text-xs">
+
+        <!-- Profile Image -->
+        <div class="flex items-center gap-4 border border-dashed border-slate-200 rounded-[5px] p-3 bg-slate-50/50">
+          <div class="w-12 h-12 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0 flex items-center justify-center">
+            <img v-if="currentAvatar" :src="currentAvatar" class="w-full h-full object-cover" alt="Avatar" />
+            <IconUser v-else class="w-6 h-6 text-slate-400" />
+          </div>
+          <div>
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Profile Photo</label>
+            <div class="flex items-center gap-2">
               <input
-                id="profile-email-input"
-                v-model="form.email"
-                type="email"
-                disabled
-                class="w-full rounded-[3px] border border-slate-200 px-3 py-1.5 text-xs text-slate-400 bg-slate-50 focus:outline-none cursor-not-allowed"
-                placeholder="Enter email address..."
+                ref="fileInput"
+                type="file"
+                accept="image/*"
+                class="hidden"
+                @change="onFileSelected"
               />
-            </div>
-            <div>
-              <label for="profile-phone-input" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Phone Number</label>
-              <input
-                id="profile-phone-input"
-                v-model="form.phone"
-                type="text"
-                class="w-full rounded-[3px] border border-slate-200 px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:border-slate-400 bg-white"
-                placeholder="Enter phone number..."
-              />
-            </div>
-          </div>
-
-          <!-- Read-only Details View -->
-          <div v-else class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-xs">
-            <div>
-              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">First Name</span>
-              <span class="text-sm text-slate-700 font-medium">{{ auth.user?.first_name || '—' }}</span>
-            </div>
-            <div>
-              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Last Name</span>
-              <span class="text-sm text-slate-700 font-medium">{{ auth.user?.last_name || '—' }}</span>
-            </div>
-            <div>
-              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Email Address</span>
-              <span class="text-sm text-slate-700 font-medium">{{ auth.user?.email || '—' }}</span>
-            </div>
-            <div>
-              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Phone Number</span>
-              <span class="text-sm text-slate-700 font-medium">{{ auth.user?.phone || '—' }}</span>
-            </div>
-            <div>
-              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Entity Type</span>
-              <span class="text-sm text-slate-700 font-medium capitalize">{{ auth.user?.entity_type?.replace('_', ' ') || '—' }}</span>
-            </div>
-            <div>
-              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Account Status</span>
-              <div class="mt-0.5 flex items-center gap-1.5">
-                <span class="rounded-[3px] px-2 py-0.5 text-[10px] font-medium bg-green-100 text-green-700" v-if="auth.user?.is_active">
-                  Active
-                </span>
-                <span class="rounded-[3px] px-2 py-0.5 text-[10px] font-medium bg-red-100 text-red-700" v-else>
-                  Inactive
-                </span>
-                <span class="rounded-[3px] bg-slate-100 text-slate-600 px-2 py-0.5 text-[10px] font-medium uppercase">
-                  {{ auth.user?.status }}
-                </span>
-              </div>
-            </div>
-            <div>
-              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">System Roles</span>
-              <div class="mt-0.5 flex flex-wrap gap-1">
-                <span v-for="role in (auth.user?.roles || [])" :key="role" class="rounded-[3px] bg-slate-100 text-slate-600 px-2 py-0.5 text-[10px] font-medium">
-                  {{ role }}
-                </span>
-              </div>
-            </div>
-            <div>
-              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Last Login Session</span>
-              <span class="text-sm text-slate-700 font-medium">{{ fmt(auth.user?.last_login_at) }}</span>
-            </div>
-            <div class="sm:col-span-2 border-t border-slate-100 pt-4 flex gap-6 text-[10px] text-slate-400">
-              <span>Account Created: {{ fmt(auth.user?.created_at) }}</span>
-              <span>Last Updated: {{ fmt(auth.user?.updated_at) }}</span>
+              <button
+                @click="triggerFileSelect"
+                class="px-3 py-1 bg-white border border-slate-200 rounded-[3px] text-[10px] font-bold text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
+              >
+                Choose Photo
+              </button>
             </div>
           </div>
         </div>
 
-        <!-- 2. RECENT ACTIVITY CARD -->
-        <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden text-left">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-sm font-semibold text-slate-800">Recent activity</h2>
-            <a href="#" id="view-all-updates-link" class="text-xs font-semibold text-[#3b4b6b] hover:text-[#2e3b54] hover:underline">See all updates &gt;</a>
+        <!-- First and Last Name Grid -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">First Name</label>
+            <input
+              v-model="editForm.first_name"
+              type="text"
+              class="w-full rounded-[3px] border border-slate-200 px-3 py-1.5 text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:border-slate-400 bg-white"
+              placeholder="First name..."
+            />
           </div>
-          <div class="p-6 space-y-4">
-            <div class="flex items-start gap-3 text-xs text-slate-600">
-              <IconCalendar class="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
-              <div>
-                <span class="font-bold text-slate-800">28 February</span>
-                <span class="mx-1 font-medium text-slate-700">Meeting with client</span>
-                <span class="text-slate-400">about</span>
-                <a href="#" class="ml-1 text-indigo-600 hover:text-indigo-800 hover:underline font-semibold">Spotify redesign</a>
-              </div>
-            </div>
-            <div class="flex items-start gap-3 text-xs text-slate-600">
-              <IconCalendar class="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
-              <div>
-                <span class="font-bold text-slate-800">1 March</span>
-                <span class="mx-1 font-medium text-slate-700">New incoming request</span>
-                <span class="text-slate-400">send price for</span>
-                <a href="#" class="ml-1 text-indigo-600 hover:text-indigo-800 hover:underline font-semibold">Fintess mobile app design</a>
-              </div>
-            </div>
-            <div class="flex items-start gap-3 text-xs text-slate-600">
-              <IconCalendar class="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
-              <div>
-                <span class="font-bold text-slate-800">2 March</span>
-                <span class="mx-1 font-medium text-slate-700">Meeting with client</span>
-                <span class="text-slate-400">about</span>
-                <a href="#" class="ml-1 text-indigo-600 hover:text-indigo-800 hover:underline font-semibold">Dropbox branding conpect</a>
-              </div>
-            </div>
+          <div>
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Last Name</label>
+            <input
+              v-model="editForm.last_name"
+              type="text"
+              class="w-full rounded-[3px] border border-slate-200 px-3 py-1.5 text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:border-slate-400 bg-white"
+              placeholder="Last name..."
+            />
           </div>
         </div>
 
-        <!-- 3. RECENT TASKS CARD -->
-        <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden text-left">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-sm font-semibold text-slate-800">Recent tasks</h2>
-            <a href="#" id="view-all-tasks-link" class="text-xs font-semibold text-[#3b4b6b] hover:text-[#2e3b54] hover:underline">See all tasks &gt;</a>
+        <!-- Email & Phone Grid -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Email</label>
+            <input
+              :value="auth.user?.email"
+              type="email"
+              disabled
+              class="w-full rounded-[3px] border border-slate-200 px-3 py-1.5 text-xs text-slate-400 bg-slate-50 cursor-not-allowed"
+              placeholder="email..."
+            />
           </div>
-          <div class="divide-y divide-slate-100">
-            <!-- Row 1 -->
-            <div class="px-6 py-3 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
-              <div class="flex items-center gap-3">
-                <input type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4" />
-                <span class="text-xs font-semibold text-slate-700">Prepare HTML & CSS</span>
-              </div>
-              <div class="flex items-center gap-4 text-slate-400 text-xs">
-                <span class="flex items-center gap-1"><IconGitFork class="w-3.5 h-3.5" /> 5/19</span>
-                <span class="flex items-center gap-1"><IconMessageCircle class="w-3.5 h-3.5" /> 7</span>
-                <div class="flex -space-x-1.5 overflow-hidden">
-                  <div class="w-5 h-5 rounded-full border border-white bg-slate-300 overflow-hidden"><IconUser class="w-full h-full p-0.5 text-slate-500" /></div>
-                  <div class="w-5 h-5 rounded-full border border-white bg-slate-400 overflow-hidden"><IconUser class="w-full h-full p-0.5 text-slate-500" /></div>
-                </div>
-              </div>
-            </div>
-            <!-- Row 2 -->
-            <div class="px-6 py-3 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
-              <div class="flex items-center gap-3">
-                <input type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4" />
-                <span class="text-xs font-semibold text-slate-700">Design search page</span>
-              </div>
-              <div class="flex items-center gap-4 text-slate-400 text-xs">
-                <span class="flex items-center gap-1"><IconGitFork class="w-3.5 h-3.5" /> 4/8</span>
-                <span class="flex items-center gap-1"><IconMessageCircle class="w-3.5 h-3.5" /> 2</span>
-                <div class="flex -space-x-1.5 overflow-hidden">
-                  <div class="w-5 h-5 rounded-full border border-white bg-slate-300 overflow-hidden"><IconUser class="w-full h-full p-0.5 text-slate-500" /></div>
-                </div>
-              </div>
-            </div>
-            <!-- Row 3 -->
-            <div class="px-6 py-3 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
-              <div class="flex items-center gap-3">
-                <input type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4" />
-                <span class="text-xs font-semibold text-slate-700">Prepare HTML & CSS</span>
-              </div>
-              <div class="flex items-center gap-4 text-slate-400 text-xs">
-                <span class="flex items-center gap-1"><IconGitFork class="w-3.5 h-3.5" /> 19/49</span>
-                <span class="flex items-center gap-1"><IconMessageCircle class="w-3.5 h-3.5" /> 23</span>
-                <div class="flex -space-x-1.5 overflow-hidden">
-                  <div class="w-5 h-5 rounded-full border border-white bg-slate-300 overflow-hidden"><IconUser class="w-full h-full p-0.5 text-slate-500" /></div>
-                  <div class="w-5 h-5 rounded-full border border-white bg-slate-400 overflow-hidden"><IconUser class="w-full h-full p-0.5 text-slate-500" /></div>
-                  <div class="w-5 h-5 rounded-full border border-white bg-slate-500 overflow-hidden"><IconUser class="w-full h-full p-0.5 text-slate-500" /></div>
-                </div>
-              </div>
-            </div>
-            <!-- Row 4 -->
-            <div class="px-6 py-3 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
-              <div class="flex items-center gap-3">
-                <input type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4" />
-                <span class="text-xs font-semibold text-slate-700">Budget and contract</span>
-              </div>
-              <div class="flex items-center gap-4 text-slate-400 text-xs">
-                <span class="flex items-center gap-1"><IconGitFork class="w-3.5 h-3.5" /> 9/18</span>
-                <span class="flex items-center gap-1"><IconMessageCircle class="w-3.5 h-3.5" /> 6</span>
-                <div class="flex -space-x-1.5 overflow-hidden">
-                  <div class="w-5 h-5 rounded-full border border-white bg-slate-300 overflow-hidden"><IconUser class="w-full h-full p-0.5 text-slate-500" /></div>
-                </div>
-              </div>
-            </div>
-            <!-- Row 5 -->
-            <div class="px-6 py-3 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
-              <div class="flex items-center gap-3">
-                <input type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4" />
-                <span class="text-xs font-semibold text-slate-700">Fix issues</span>
-              </div>
-              <div class="flex items-center gap-4 text-slate-400 text-xs">
-                <span class="flex items-center gap-1"><IconGitFork class="w-3.5 h-3.5" /> 15/30</span>
-                <span class="flex items-center gap-1"><IconMessageCircle class="w-3.5 h-3.5" /> 19</span>
-                <div class="flex -space-x-1.5 overflow-hidden">
-                  <div class="w-5 h-5 rounded-full border border-white bg-slate-300 overflow-hidden"><IconUser class="w-full h-full p-0.5 text-slate-500" /></div>
-                  <div class="w-5 h-5 rounded-full border border-white bg-slate-400 overflow-hidden"><IconUser class="w-full h-full p-0.5 text-slate-500" /></div>
-                </div>
-              </div>
-            </div>
+          <div>
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Phone Number</label>
+            <input
+              v-model="editForm.phone"
+              type="text"
+              class="w-full rounded-[3px] border border-slate-200 px-3 py-1.5 text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:border-slate-400 bg-white"
+              placeholder="Phone number..."
+            />
           </div>
         </div>
-
-        <!-- 4. UPLOADED FILES CARD -->
-        <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden text-left">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-sm font-semibold text-slate-800">Uploaded files</h2>
-            <a href="#" id="view-all-files-link" class="text-xs font-semibold text-[#3b4b6b] hover:text-[#2e3b54] hover:underline">See all files &gt;</a>
-          </div>
-          <div class="p-6 space-y-4">
-            <!-- File 1 -->
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded bg-amber-50 flex items-center justify-center text-amber-600 border border-amber-100">
-                  <IconFileText class="w-5 h-5" />
-                </div>
-                <div>
-                  <span class="text-xs font-semibold text-slate-700 block">IOtask web UI kit.sketch</span>
-                  <span class="rounded-[3px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 text-[9px] font-bold">Design</span>
-                </div>
-              </div>
-              <div class="flex items-center gap-4">
-                <div class="flex -space-x-1.5 overflow-hidden">
-                  <div class="w-5 h-5 rounded-full border border-white bg-slate-200 text-[8px] font-bold flex items-center justify-center text-slate-500">+5</div>
-                </div>
-                <button class="text-slate-400 hover:text-slate-600"><IconDots class="w-4 h-4" /></button>
-              </div>
-            </div>
-            <!-- File 2 -->
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100">
-                  <IconFileText class="w-5 h-5" />
-                </div>
-                <div>
-                  <span class="text-xs font-semibold text-slate-700 block">User stories.docx</span>
-                  <span class="rounded-[3px] bg-slate-100 text-slate-600 px-1.5 py-0.5 text-[9px] font-bold">Documents</span>
-                </div>
-              </div>
-              <div class="flex items-center gap-4">
-                <div class="flex -space-x-1.5 overflow-hidden">
-                  <div class="w-5 h-5 rounded-full border border-white bg-slate-200 text-[8px] font-bold flex items-center justify-center text-slate-500">+3</div>
-                </div>
-                <button class="text-slate-400 hover:text-slate-600"><IconDots class="w-4 h-4" /></button>
-              </div>
-            </div>
-            <!-- File 3 -->
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100">
-                  <IconFileText class="w-5 h-5" />
-                </div>
-                <div>
-                  <span class="text-xs font-semibold text-slate-700 block">Budget estimates for UI design.xlsx</span>
-                  <span class="rounded-[3px] bg-slate-100 text-slate-600 px-1.5 py-0.5 text-[9px] font-bold">Documents</span>
-                </div>
-              </div>
-              <div class="flex items-center gap-4">
-                <div class="flex -space-x-1.5 overflow-hidden">
-                  <div class="w-5 h-5 rounded-full border border-white bg-slate-200 text-[8px] font-bold flex items-center justify-center text-slate-500">+6</div>
-                </div>
-                <button class="text-slate-400 hover:text-slate-600"><IconDots class="w-4 h-4" /></button>
-              </div>
-            </div>
-            <!-- File 4 -->
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded bg-red-50 flex items-center justify-center text-red-600 border border-red-100">
-                  <IconFileText class="w-5 h-5" />
-                </div>
-                <div>
-                  <span class="text-xs font-semibold text-slate-700 block">Presentation for investors.pptx</span>
-                </div>
-              </div>
-              <div class="flex items-center gap-4">
-                <div class="flex -space-x-1.5 overflow-hidden">
-                  <div class="w-5 h-5 rounded-full border border-white bg-slate-200 text-[8px] font-bold flex items-center justify-center text-slate-500">+8</div>
-                </div>
-                <button class="text-slate-400 hover:text-slate-600"><IconDots class="w-4 h-4" /></button>
-              </div>
-            </div>
-          </div>
         </div>
 
+      <!-- Footer -->
+      <div class="flex items-center justify-end gap-2 p-5 border-t border-slate-100 bg-slate-50/30">
+        <button
+          @click="closeEditModal"
+          class="rounded-[3px] bg-white text-slate-500 border border-slate-200 px-4 py-1.5 text-xs font-medium hover:bg-slate-50 transition-colors shadow-sm"
+        >
+          Cancel
+        </button>
+        <button
+          @click="saveEdit"
+          :disabled="saving"
+          class="rounded-[3px] bg-slate-900 text-white px-4 py-1.5 text-xs font-medium hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50"
+        >
+          {{ saving ? 'Saving...' : 'Save Changes' }}
+        </button>
       </div>
     </div>
   </div>

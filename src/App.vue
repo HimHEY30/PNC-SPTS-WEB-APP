@@ -25,15 +25,33 @@ onMounted(async () => {
     leave-from-class="opacity-100"
     leave-to-class="opacity-0"
   >
-    <div v-if="toast.show" class="fixed top-4 right-4 z-[9999] max-w-sm w-full bg-white rounded-lg shadow-lg border border-slate-100 pointer-events-auto flex overflow-hidden">
+    <div
+      v-if="toast.show"
+      class="fixed top-4 right-4 z-[9999] max-w-sm w-full bg-white rounded-lg shadow-lg border border-slate-100 pointer-events-auto flex overflow-hidden"
+    >
       <div class="p-4 flex items-start gap-3 w-full">
-        <div v-if="toast.type === 'success'" class="flex-shrink-0 text-emerald-500 bg-emerald-50 p-1.5 rounded-full">
-          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <div
+          v-if="toast.type === 'success'"
+          class="flex-shrink-0 text-emerald-500 bg-emerald-50 p-1.5 rounded-full"
+        >
+          <svg
+            class="h-5 w-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
           </svg>
         </div>
         <div v-else class="flex-shrink-0 text-red-500 bg-red-50 p-1.5 rounded-full">
-          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <svg
+            class="h-5 w-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </div>
@@ -45,8 +63,17 @@ onMounted(async () => {
             {{ toast.message }}
           </p>
         </div>
-        <button @click="toast.hideToast()" class="flex-shrink-0 text-slate-400 hover:text-slate-500 transition-colors p-0.5 rounded-lg hover:bg-slate-50">
-          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <button
+          @click="toast.hideToast()"
+          class="flex-shrink-0 text-slate-400 hover:text-slate-500 transition-colors p-0.5 rounded-lg hover:bg-slate-50"
+        >
+          <svg
+            class="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>

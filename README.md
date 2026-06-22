@@ -1,5 +1,14 @@
 # 🎓 PNC SPTS Web App
-> **Student Performance Tracking System** — a sleek, Trello-inspired kanban board designed for monitoring and managing student performance metrics.
+> **Student Follow-Up System** — A centralized platform for monitoring student activities, managing follow-up records, and tracking progress through a chronological timeline.
+
+---
+
+## 🌟 Key Features
+
+* 📁 **Student Directory & Profiles**: A clean, searchable dashboard to quickly view individual student files.
+* 📝 **Follow-Up Management**: An easy-to-use form for teachers to log new monitoring records, categorize incident types, and assign severity levels.
+* 📎 **Document Attachments**: Secure file uploading to attach supporting documentation (PDFs, images, or forms) directly to any specific record.
+* 🕒 **Chronological Timeline**: A unified, historical activity feed for each student that automatically orders notes, status updates, and uploaded files by date.
 
 ---
 

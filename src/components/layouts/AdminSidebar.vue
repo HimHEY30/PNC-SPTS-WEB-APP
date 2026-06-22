@@ -1,61 +1,107 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, type Component } from 'vue'
 import { useRoute } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import {
   IconLayoutDashboard,
   IconUsers,
-  IconGitFork,
   IconListCheck,
-  IconCalendar,
   IconBook,
   IconBriefcase,
-  IconChartBar,
-  IconGlobe,
   IconChevronRight,
   IconChevronLeft,
-  IconSchool,
 } from '@tabler/icons-vue'
 import logoSrc from '@/assets/images/logo1.png'
 
 const route = useRoute()
+const auth = useAuthStore()
 
 const collapsed = ref(false)
 
+interface MenuItem {
+  to: string
+  label: string
+  icon: Component
+  exact?: boolean
+  roles?: string[]
+}
+
+interface MenuGroup {
+  title: string
+  items: MenuItem[]
+}
+
 // Reorganized categories and menu links matching the HEITKAMP CRM
-const menuGroups = [
+// Added allowed roles check to restrict navigation links
+const menuGroups: MenuGroup[] = [
   {
     title: 'Menu',
     items: [
       { to: '/admin', label: 'Dashboard', icon: IconLayoutDashboard, exact: true },
       { to: '/admin/students', label: 'Student List', icon: IconUsers },
-      { to: '/admin/courses', label: 'Enrolled Courses', icon: IconGitFork },
     ],
   },
   {
     title: 'Productivity',
     items: [
-      { to: '/admin/tasks', label: 'Follow-Up Timeline', icon: IconListCheck },
-      { to: '/admin/calendar', label: 'Calendar', icon: IconCalendar },
-      { to: '/admin/goals', label: 'Goal Setting', icon: IconSchool },
+      {
+        to: '/admin/tasks',
+        label: 'Follow-Up Timeline',
+        icon: IconListCheck,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER', 'FOLLOWUP_OFFICER'],
+      },
     ],
   },
   {
     title: 'Administration',
     items: [
-      { to: '/admin/users', label: 'User Management', icon: IconUsers },
-      { to: '/admin/teachers', label: 'Teacher Management', icon: IconBook },
-      { to: '/admin/active', label: 'Active Follow-Ups', icon: IconBriefcase },
-      { to: '/admin/reports', label: 'Reports', icon: IconChartBar },
+      {
+        to: '/admin/users',
+        label: 'User Management',
+        icon: IconUsers,
+        roles: ['SUPER_ADMIN', 'ADMIN'],
+      },
+      {
+        to: '/admin/teachers',
+        label: 'Teacher Management',
+        icon: IconBook,
+        roles: ['SUPER_ADMIN', 'ADMIN'],
+      },
+      {
+        to: '/admin/active',
+        label: 'Active Follow-Ups',
+        icon: IconBriefcase,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'ACADEMIC_MANAGER', 'FOLLOWUP_OFFICER'],
+      },
     ],
   },
   {
     title: 'Configuration',
     items: [
-      { to: '/admin/website', label: 'PNC Portal', icon: IconGlobe },
-      { to: '/admin/settings', label: 'Follow-Up Type Management', icon: IconBook },
+      {
+        to: '/admin/settings',
+        label: 'Follow-Up Type Management',
+        icon: IconBook,
+        roles: ['SUPER_ADMIN', 'ADMIN'],
+      },
     ],
   },
 ]
+
+const filteredGroups = computed(() => {
+  const userRoles = auth.user?.roles || []
+  const hasRole = (allowedRoles?: string[]) => {
+    if (!allowedRoles) return true
+    return allowedRoles.some((r) => userRoles.includes(r))
+  }
+
+  return menuGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => hasRole(item.roles)),
+    }))
+    .filter((group) => group.items.length > 0)
+})
 
 const isActive = (to: string, exact?: boolean) => {
   if (exact) {
@@ -68,15 +114,14 @@ const getLinkClass = (to: string, exact?: boolean) => {
   const active = isActive(to, exact)
   return [
     'flex items-center transition-all duration-200 select-none overflow-hidden rounded-[3px]',
-    collapsed.value 
-      ? 'justify-center p-2 mx-auto w-9 h-9' 
+    collapsed.value
+      ? 'justify-center p-2 mx-auto w-9 h-9'
       : 'gap-2.5 px-3 py-2 text-xs font-bold mx-2',
     active
       ? 'bg-[#3b4b6b] text-white shadow-sm'
       : 'text-[#475569] hover:bg-slate-100 hover:text-[#0f172a]',
   ]
 }
-
 </script>
 
 <template>
@@ -85,14 +130,16 @@ const getLinkClass = (to: string, exact?: boolean) => {
     :class="collapsed ? 'w-16' : 'w-60'"
   >
     <!-- Brand / Logo Header -->
-    <div 
+    <div
       class="flex h-14 items-center transition-all duration-300 overflow-hidden"
       :class="collapsed ? 'justify-center' : 'gap-3 px-4 border-b border-slate-50'"
     >
       <!-- Custom Logo (adjusted to w-9 h-9) -->
       <img :src="logoSrc" class="w-9 h-9 object-contain shrink-0" alt="Logo" />
       <div v-show="!collapsed" class="min-w-0 flex-1 text-left">
-        <p class="text-xs font-black text-[#0f172a] tracking-widest uppercase leading-none">PNC SPTS</p>
+        <p class="text-xs font-black text-[#0f172a] tracking-widest uppercase leading-none">
+          PNC SPTS
+        </p>
       </div>
       <button
         v-show="!collapsed"
@@ -105,14 +152,17 @@ const getLinkClass = (to: string, exact?: boolean) => {
 
     <!-- Toggle Button for collapsed state -->
     <div v-if="collapsed" class="flex justify-center py-1 border-b border-slate-50 bg-slate-50/30">
-      <button @click="collapsed = !collapsed" class="text-slate-300 hover:text-slate-500 transition-colors">
+      <button
+        @click="collapsed = !collapsed"
+        class="text-slate-300 hover:text-slate-500 transition-colors"
+      >
         <IconChevronRight class="h-4 w-4" />
       </button>
     </div>
 
     <!-- Scrollable Navigation menu -->
     <nav class="flex-1 overflow-auto space-y-4 text-left scrollbar-thin pt-4">
-      <div v-for="group in menuGroups" :key="group.title" class="space-y-1">
+      <div v-for="group in filteredGroups" :key="group.title" class="space-y-1">
         <!-- Group Header title -->
         <p
           v-show="!collapsed"
@@ -130,14 +180,14 @@ const getLinkClass = (to: string, exact?: boolean) => {
               :title="collapsed ? item.label : ''"
             >
               <component :is="item.icon" class="h-4 w-4 shrink-0" />
-              <span v-show="!collapsed" class="flex-1 whitespace-nowrap text-xs">{{ item.label }}</span>
+              <span v-show="!collapsed" class="flex-1 whitespace-nowrap text-xs">{{
+                item.label
+              }}</span>
             </router-link>
           </li>
         </ul>
       </div>
     </nav>
-
-
   </aside>
 </template>
 

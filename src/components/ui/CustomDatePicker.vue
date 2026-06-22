@@ -31,23 +31,37 @@ const currentViewMonth = ref(new Date().getMonth()) // 0-indexed
 const dropdownStyle = ref<Record<string, string>>({})
 
 // Initialize from props
-watch(() => props.modelValue, (newVal) => {
-  if (newVal) {
-    const d = new Date(newVal)
-    if (!isNaN(d.getTime())) {
-      selectedDate.value = d
-      currentViewYear.value = d.getUTCFullYear()
-      currentViewMonth.value = d.getUTCMonth()
-      return
+watch(
+  () => props.modelValue,
+  (newVal) => {
+    if (newVal) {
+      const d = new Date(newVal)
+      if (!isNaN(d.getTime())) {
+        selectedDate.value = d
+        currentViewYear.value = d.getUTCFullYear()
+        currentViewMonth.value = d.getUTCMonth()
+        return
+      }
     }
-  }
-  selectedDate.value = null
-}, { immediate: true })
+    selectedDate.value = null
+  },
+  { immediate: true },
+)
 
 // Helper constants
 const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ]
 
 const WEEK_DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
@@ -122,7 +136,7 @@ const formattedInputDate = computed(() => {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
-    timeZone: 'UTC'
+    timeZone: 'UTC',
   })
 })
 
@@ -144,9 +158,11 @@ function selectDay(day: { date: number; month: number; year: number }) {
 
 function isSelectedDay(day: { date: number; month: number; year: number }) {
   if (!selectedDate.value) return false
-  return selectedDate.value.getUTCDate() === day.date &&
-         selectedDate.value.getUTCMonth() === day.month &&
-         selectedDate.value.getUTCFullYear() === day.year
+  return (
+    selectedDate.value.getUTCDate() === day.date &&
+    selectedDate.value.getUTCMonth() === day.month &&
+    selectedDate.value.getUTCFullYear() === day.year
+  )
 }
 
 function confirmSelection() {
@@ -205,7 +221,7 @@ function updatePosition() {
   dropdownStyle.value = {
     position: 'absolute',
     top: `${top}px`,
-    left: `${finalLeft}px`
+    left: `${finalLeft}px`,
   }
 }
 
@@ -276,7 +292,10 @@ onUnmounted(() => {
   window.removeEventListener('scroll', updatePosition, true)
 })
 
-const getDayClass = (day: { date: number; month: number; year: number; isCurrentMonth: boolean }, idx: number) => {
+const getDayClass = (
+  day: { date: number; month: number; year: number; isCurrentMonth: boolean },
+  idx: number,
+) => {
   if (!day.isCurrentMonth) {
     return 'text-[#cbd5e1]'
   }
@@ -303,8 +322,8 @@ const getDayClass = (day: { date: number; month: number; year: number; isCurrent
         @click="toggleOpen"
         class="w-full rounded-[3px] border border-slate-200 pl-3 pr-8 py-1.5 text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:border-slate-400 bg-white cursor-pointer select-none"
       />
-      <IconCalendar 
-        class="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" 
+      <IconCalendar
+        class="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
       />
     </div>
 
@@ -319,8 +338,10 @@ const getDayClass = (day: { date: number; month: number; year: number; isCurrent
         <!-- Title & Icon Header Row -->
         <div class="flex items-start justify-between mb-4">
           <div>
-            <h4 class="text-[17px] font-black text-[#1e293b] tracking-tight leading-none">Select Date</h4>
-            
+            <h4 class="text-[17px] font-black text-[#1e293b] tracking-tight leading-none">
+              Select Date
+            </h4>
+
             <!-- Month/Year selectors -->
             <div class="flex items-center gap-1.5 mt-2.5">
               <!-- Month Dropdown -->
@@ -331,7 +352,13 @@ const getDayClass = (day: { date: number; month: number; year: number; isCurrent
                   class="bg-[#f1f5f9] hover:bg-[#e2e8f0] text-slate-800 text-[10px] font-bold px-2.5 py-1 pr-6 rounded-[8px] outline-none cursor-pointer transition-colors flex items-center justify-between min-w-[75px] text-left"
                 >
                   <span>{{ MONTH_NAMES[currentViewMonth] }}</span>
-                  <svg class="w-2.5 h-2.5 text-slate-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                  <svg
+                    class="w-2.5 h-2.5 text-slate-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                  >
                     <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
@@ -347,7 +374,9 @@ const getDayClass = (day: { date: number; month: number; year: number; isCurrent
                     type="button"
                     @click="selectMonth(idx)"
                     class="w-full text-left px-3 py-1 text-[10px] font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#ff9c07] transition-colors"
-                    :class="{ 'text-[#ff9c07] bg-slate-50/50 active-month': currentViewMonth === idx }"
+                    :class="{
+                      'text-[#ff9c07] bg-slate-50/50 active-month': currentViewMonth === idx,
+                    }"
                   >
                     {{ name }}
                   </button>
@@ -362,7 +391,13 @@ const getDayClass = (day: { date: number; month: number; year: number; isCurrent
                   class="bg-[#f1f5f9] hover:bg-[#e2e8f0] text-slate-800 text-[10px] font-bold px-2.5 py-1 pr-6 rounded-[8px] outline-none cursor-pointer transition-colors flex items-center justify-between min-w-[65px] text-left"
                 >
                   <span>{{ currentViewYear }}</span>
-                  <svg class="w-2.5 h-2.5 text-slate-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                  <svg
+                    class="w-2.5 h-2.5 text-slate-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                  >
                     <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
@@ -388,12 +423,16 @@ const getDayClass = (day: { date: number; month: number; year: number; isCurrent
           </div>
 
           <!-- Orange calendar badge (as in screenshot) -->
-          <div class="relative w-11 h-11 bg-[#ff9c07] rounded-[10px] flex items-center justify-center shadow-[0_3px_8px_rgba(255,156,7,0.2)] select-none shrink-0 border border-[#ff9c07]/20">
+          <div
+            class="relative w-11 h-11 bg-[#ff9c07] rounded-[10px] flex items-center justify-center shadow-[0_3px_8px_rgba(255,156,7,0.2)] select-none shrink-0 border border-[#ff9c07]/20"
+          >
             <!-- Spiral binding rings -->
             <span class="absolute -top-1 left-[11px] w-0.5 h-2.5 bg-[#e65c00] rounded-full"></span>
             <span class="absolute -top-1 right-[11px] w-0.5 h-2.5 bg-[#e65c00] rounded-full"></span>
             <!-- Selected Day -->
-            <span class="text-white font-black text-lg leading-none mt-0.5 select-none">{{ displayDay }}</span>
+            <span class="text-white font-black text-lg leading-none mt-0.5 select-none">{{
+              displayDay
+            }}</span>
           </div>
         </div>
 
@@ -417,11 +456,11 @@ const getDayClass = (day: { date: number; month: number; year: number; isCurrent
             @click="selectDay(day)"
             :class="[
               'text-[10px] py-0.5 font-bold relative focus:outline-none flex flex-col items-center justify-center rounded-[6px] transition-all hover:bg-slate-50 h-[25px] w-full',
-              getDayClass(day, idx)
+              getDayClass(day, idx),
             ]"
           >
             <span>{{ String(day.date).padStart(2, '0') }}</span>
-            
+
             <!-- Selected day underline style -->
             <span
               v-if="isSelectedDay(day)"
@@ -446,10 +485,10 @@ const getDayClass = (day: { date: number; month: number; year: number; isCurrent
 <style scoped>
 /* Scoped utility to hide scrollbars while preserving scrolling ability */
 .custom-scroll-hidden {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
 }
 .custom-scroll-hidden::-webkit-scrollbar {
-  display: none;  /* Chrome, Safari, and Opera */
+  display: none; /* Chrome, Safari, and Opera */
 }
 </style>
